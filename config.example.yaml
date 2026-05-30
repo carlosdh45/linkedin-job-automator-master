@@ -1,0 +1,87 @@
+# CorosDev Opportunity Copilot — Configuration
+#
+# SECURITY: Never commit real credentials. This file uses ${ENV_VAR} references.
+# Copy to config.yaml and fill your .env with actual values.
+#
+# Setup:
+#   cp config.example.yaml config.yaml
+#   cp .env.example .env
+#   nano .env   # add your API keys and credentials
+
+linkedin:
+  email: "${LINKEDIN_EMAIL}"
+  password: "${LINKEDIN_PASSWORD}"
+  session_path: "session/linkedin_session.json"
+
+paths:
+  cv_pdf: "C:/path/to/your/CV.pdf"
+  jobs_csv: "C:/path/to/your/jobs.csv"
+  database: "data/jobs.db"
+  logs_dir: "logs"
+
+filters:
+  location_keywords:
+    - "Remote"
+    - "United States"
+    - "Colombia"
+    - "Europe"
+    - "Worldwide"
+  title_keywords:
+    - "Fullstack"
+    - "Full Stack"
+    - "Full-Stack"
+    - "Software Engineer"
+    - "AI Engineer"
+    - "Tech Lead"
+    - "Backend"
+    - "Frontend"
+    - "Product Manager"
+    - "Solution Architect"
+    - "Delivery Manager"
+    - "Program Manager"
+  blacklisted_companies: []
+  max_days_old: 30
+
+# Human-in-the-loop limits (conservative defaults)
+limits:
+  max_drafts_per_day: 10      # max drafts generated per run
+  max_emails_per_day: 5       # max emails sent per --send-approved run
+  min_job_score_for_draft: 70 # only generate drafts for jobs scoring >= this
+  min_lead_score_for_draft: 60
+
+application:
+  max_applications_per_run: 10  # legacy --apply command
+  delay_min: 2.0
+  delay_max: 5.0
+  max_modal_steps: 4
+  headless: false
+
+apis:
+  anthropic_api_key: "${ANTHROPIC_API_KEY}"
+  hunter_api_key: "${HUNTER_API_KEY}"
+
+answer_generator:
+  model: "claude-sonnet-4-6"
+  max_tokens: 256
+  # Your professional positioning — how you want to be presented to employers/clients
+  positioning: "AI-Augmented Fullstack System Engineer & Delivery Lead"
+
+email_finder:
+  rate_limit_seconds: 1.0
+  max_domains_per_run: 25
+  prefer_external_apply_domains: true
+
+outreach:
+  # auto_send: MUST remain false. Use --send-approved after --review-queue.
+  auto_send: false
+  smtp_host: "${SMTP_HOST}"
+  smtp_port: 587
+  smtp_user: "${SMTP_USER}"
+  smtp_password: "${SMTP_PASSWORD}"
+  from_name: "Your Full Name"
+
+# Quality gate thresholds (do not lower without good reason)
+quality_thresholds:
+  min_personalization_score: 75
+  max_spam_risk_score: 35
+  max_ai_sounding_score: 40

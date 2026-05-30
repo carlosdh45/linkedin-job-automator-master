@@ -1,0 +1,36 @@
+# ── Secrets & credentials (NEVER commit these) ────────────────────────────────
+.env
+config.yaml
+
+# ── Runtime data ───────────────────────────────────────────────────────────────
+data/
+session/
+logs/
+exports/
+
+# ── SQLite ─────────────────────────────────────────────────────────────────────
+*.db
+*.db-wal
+*.db-shm
+
+# ── Python ─────────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+.python-version
+
+# ── Testing ────────────────────────────────────────────────────────────────────
+.pytest_cache/
+
+# ── Editors & OS ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/

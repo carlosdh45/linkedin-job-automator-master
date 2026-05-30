@@ -1,0 +1,63 @@
+linkedin:
+  email: "test@example.com"
+  password: "test_password"
+  session_path: "/tmp/test_session.json"
+
+paths:
+  cv_pdf: "/tmp/fake_cv.pdf"
+  jobs_csv: "tests/fixtures/sample_jobs.csv"
+  database: "/tmp/test_jobs.db"
+  logs_dir: "/tmp/test_logs"
+
+filters:
+  location_keywords:
+    - "Remote"
+    - "Colombia"
+  title_keywords:
+    - "Fullstack"
+    - "Full Stack"
+    - "Tech Lead"
+    - "Solution Architect"
+    - "Engineer"
+  blacklisted_companies: []
+  max_days_old: 60
+
+limits:
+  max_drafts_per_day: 10
+  max_emails_per_day: 5
+  min_job_score_for_draft: 50
+  min_lead_score_for_draft: 40
+
+application:
+  max_applications_per_run: 5
+  delay_min: 1.0
+  delay_max: 2.0
+  max_modal_steps: 3
+  headless: true
+
+apis:
+  anthropic_api_key: "sk-ant-test-key"
+  hunter_api_key: "test-hunter-key"
+
+answer_generator:
+  model: "claude-haiku-4-5-20251001"
+  max_tokens: 256
+  positioning: "Test Fullstack Engineer"
+
+email_finder:
+  rate_limit_seconds: 0.1
+  max_domains_per_run: 5
+  prefer_external_apply_domains: true
+
+outreach:
+  auto_send: false
+  smtp_host: "smtp.example.com"
+  smtp_port: 587
+  smtp_user: "test@example.com"
+  smtp_password: "test_smtp_password"
+  from_name: "Test User"
+
+quality_thresholds:
+  min_personalization_score: 75
+  max_spam_risk_score: 35
+  max_ai_sounding_score: 40

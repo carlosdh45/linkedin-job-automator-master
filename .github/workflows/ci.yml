@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite
+        env:
+          PYTHONUTF8: "1"
+          # No real API keys needed — all external calls are mocked in tests.
+          # Fake values satisfy any config validation that might run.
+          ANTHROPIC_API_KEY: "sk-ant-test-ci-key"
+          HUNTER_API_KEY: "test-hunter-key"
+          LINKEDIN_EMAIL: "ci@test.example.com"
+          LINKEDIN_PASSWORD: "ci-test-password"
+          SMTP_HOST: "smtp.test.example.com"
+          SMTP_USER: "ci@test.example.com"
+          SMTP_PASSWORD: "ci-test-smtp-password"
+        run: python -m pytest tests/ -v --tb=short
+
+  lint:
+    name: Lint check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Check for accidental secrets in tracked files
+        run: |
+          # Fail if any tracked file contains patterns that look like real secrets
+          echo "Checking for accidental secret patterns..."
+          # Real Anthropic keys start with sk-ant-api
+          if git ls-files | xargs grep -l "sk-ant-api" 2>/dev/null; then
+            echo "ERROR: Real Anthropic API key pattern found in tracked files"
+            exit 1
+          fi
+          # Real Hunter.io keys are 40-char hex
+          if git ls-files | xargs grep -rP "hunter_api_key.*:\s*[a-f0-9]{40}" 2>/dev/null; then
+            echo "ERROR: Real Hunter.io key pattern found in tracked files"
+            exit 1
+          fi
+          echo "No secret patterns detected in tracked files."
+      - name: Verify safety invariants in code
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -c "
+          # Verify --apply is not calling LinkedInApplier
+          import ast, pathlib
+          src = pathlib.Path('main.py').read_text(encoding='utf-8')
+          tree = ast.parse(src)
+
+          # Find cmd_apply function
+          for node in ast.walk(tree):
+              if isinstance(node, ast.FunctionDef) and node.name == 'cmd_apply':
+                  for child in ast.walk(node):
+                      if isinstance(child, ast.Name) and child.id == 'LinkedInApplier':
+                          raise AssertionError('cmd_apply references LinkedInApplier — safety violation')
+          print('PASS: cmd_apply does not reference LinkedInApplier')
+
+          # Verify get_unsent_outreach filters by approved status
+          db_src = pathlib.Path('src/db.py').read_text(encoding='utf-8')
+          assert \"status = 'approved'\" in db_src or \"status='approved'\" in db_src, \
+              'get_unsent_outreach must filter by approved status'
+          print('PASS: get_unsent_outreach filters by approved status')
+
+          # Verify quality_passes has no DEV_MODE bypass
+          rq_src = pathlib.Path('src/review_queue.py').read_text(encoding='utf-8')
+          assert 'DEV_MODE' not in rq_src, \
+              'review_queue.py must not contain DEV_MODE bypass'
+          print('PASS: review_queue has no DEV_MODE bypass')
+
+          print('All safety invariants verified.')
+          "
