@@ -55,8 +55,8 @@ class TestHelpDisplay(unittest.TestCase):
                 except SystemExit:
                     pass
             output = mock_out.getvalue()
-        self.assertIn("COPILOT WORKFLOW", output,
-                      "Help text should contain COPILOT WORKFLOW section")
+        self.assertIn("DOBRYBOT WORKFLOW", output,
+                      "Help text should contain DOBRYBOT WORKFLOW section")
         self.assertIn("--discover-jobs", output)
         self.assertIn("--review-queue", output)
 
@@ -70,7 +70,7 @@ class TestHelpDisplay(unittest.TestCase):
                 except SystemExit:
                     pass
             output = mock_out.getvalue()
-        self.assertIn("COPILOT WORKFLOW", output)
+        self.assertIn("DOBRYBOT WORKFLOW", output)
 
     def test_dry_run_alone_shows_help(self):
         """--dry-run alone is not a command — must show help."""
@@ -82,7 +82,7 @@ class TestHelpDisplay(unittest.TestCase):
                 except SystemExit:
                     pass
             output = mock_out.getvalue()
-        self.assertIn("COPILOT WORKFLOW", output)
+        self.assertIn("DOBRYBOT WORKFLOW", output)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1192,6 +1192,247 @@ class TestSmtpFailureTracking(unittest.TestCase):
                 ).fetchone()
             self.assertEqual(row["status"], "failed")
             self.assertIn("535", row["failure_reason"])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 16. Seed demo data
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestSeedDemoData(unittest.TestCase):
+
+    def test_seed_demo_data_in_help(self):
+        """--seed-demo-data must appear in the CLI help text."""
+        from main import main
+        with patch("sys.argv", ["main.py"]):
+            with patch("sys.stdout", new_callable=StringIO) as out:
+                try:
+                    main()
+                except SystemExit:
+                    pass
+            self.assertIn("--seed-demo-data", out.getvalue())
+
+    def test_seed_creates_jobs(self):
+        """seed_demo_data must write scored jobs to the database."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = _make_db(tmp)
+            from src.seed_data import seed_demo_data
+            from src.db import get_jobs_by_status
+            stats = seed_demo_data(db_path)
+            self.assertGreater(stats["jobs_created"], 0)
+            scored = get_jobs_by_status(db_path, "scored")
+            self.assertGreater(len(scored), 0)
+
+    def test_seed_creates_leads(self):
+        """seed_demo_data must write scored leads to the database."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = _make_db(tmp)
+            from src.seed_data import seed_demo_data
+            from src.db import get_leads_by_status
+            stats = seed_demo_data(db_path)
+            self.assertGreater(stats["leads_created"], 0)
+            scored = get_leads_by_status(db_path, "scored")
+            self.assertGreater(len(scored), 0)
+
+    def test_seed_creates_drafts(self):
+        """seed_demo_data must write outreach drafts to the database."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = _make_db(tmp)
+            from src.seed_data import seed_demo_data
+            from src.db import get_needs_review
+            stats = seed_demo_data(db_path)
+            self.assertGreater(stats["drafts_created"], 0)
+            drafts = get_needs_review(db_path)
+            self.assertGreater(len(drafts), 0)
+
+    def test_seed_is_idempotent_for_all(self):
+        """Running seed twice on a fresh DB must not duplicate jobs, leads, or drafts."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = _make_db(tmp)
+            from src.seed_data import seed_demo_data
+            from src.db import (get_jobs_by_status, get_leads_by_status,
+                                 get_needs_review, get_outreach_by_status)
+
+            seed_demo_data(db_path)
+            jobs_1  = len(get_jobs_by_status(db_path, "scored"))
+            leads_1 = len(get_leads_by_status(db_path, "scored"))
+            review_1   = len(get_needs_review(db_path))
+            approved_1 = len(get_outreach_by_status(db_path, "approved"))
+
+            seed_demo_data(db_path)
+            jobs_2  = len(get_jobs_by_status(db_path, "scored"))
+            leads_2 = len(get_leads_by_status(db_path, "scored"))
+            review_2   = len(get_needs_review(db_path))
+            approved_2 = len(get_outreach_by_status(db_path, "approved"))
+
+            self.assertEqual(jobs_1, jobs_2,
+                             "Second seed run must not duplicate scored jobs")
+            self.assertEqual(leads_1, leads_2,
+                             "Second seed run must not duplicate scored leads")
+            self.assertEqual(review_1, review_2,
+                             "Second seed run must not duplicate needs_review drafts")
+            self.assertEqual(approved_1, approved_2,
+                             "Second seed run must not duplicate approved drafts")
+
+    def test_seed_second_run_skips_all(self):
+        """On the second run, all records should be skipped (created counts = 0)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = _make_db(tmp)
+            from src.seed_data import seed_demo_data
+            seed_demo_data(db_path)
+            stats = seed_demo_data(db_path)
+            self.assertEqual(stats["jobs_created"], 0,
+                             "Second run: no jobs should be created")
+            self.assertEqual(stats["leads_created"], 0,
+                             "Second run: no leads should be created")
+            self.assertEqual(stats["drafts_created"], 0,
+                             "Second run: no drafts should be created")
+            self.assertGreater(stats["skipped"], 0,
+                               "Second run: all records should be skipped")
+
+    def test_seed_makes_no_external_calls(self):
+        """seed_demo_data must make zero HTTP or Anthropic API calls."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = _make_db(tmp)
+            with patch("requests.get") as mock_get, \
+                 patch("requests.post") as mock_post:
+                from src.seed_data import seed_demo_data
+                seed_demo_data(db_path)
+            mock_get.assert_not_called()
+            mock_post.assert_not_called()
+
+    def test_seed_uses_safe_fake_domains(self):
+        """All demo records must use .test domains — no real email risk."""
+        from src.seed_data import DEMO_JOBS, DEMO_LEADS
+        for job in DEMO_JOBS:
+            if job.get("domain"):
+                self.assertTrue(
+                    job["domain"].endswith(".test"),
+                    f"Demo job domain must end in .test: {job['domain']}"
+                )
+        for lead in DEMO_LEADS:
+            if lead.get("contact_email"):
+                self.assertTrue(
+                    lead["contact_email"].endswith(".test"),
+                    f"Demo lead email must end in .test: {lead['contact_email']}"
+                )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 17. Daily brief and review queue show seeded data
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestBriefAndQueueWithSeedData(unittest.TestCase):
+
+    def test_daily_brief_shows_seeded_jobs(self):
+        """generate_brief must mention seeded high-priority jobs."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = _make_db(tmp)
+            from src.seed_data import seed_demo_data
+            from src.daily_brief import generate_brief
+            seed_demo_data(db_path)
+            with patch("sys.stdout", new_callable=StringIO) as out:
+                generate_brief(db_path)
+            output = out.getvalue()
+            self.assertTrue(
+                len(output) > 100,
+                "Daily brief must produce non-empty output after seeding"
+            )
+            self.assertIn("Apex Digital Solutions", output,
+                          "Daily brief must show seeded high-priority job company")
+
+    def test_daily_brief_shows_seeded_leads(self):
+        """generate_brief must mention seeded leads."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = _make_db(tmp)
+            from src.seed_data import seed_demo_data
+            from src.daily_brief import generate_brief
+            seed_demo_data(db_path)
+            with patch("sys.stdout", new_callable=StringIO) as out:
+                generate_brief(db_path)
+            output = out.getvalue()
+            self.assertIn("Palm Sun Realty", output,
+                          "Daily brief must show seeded high-priority lead company")
+
+    def test_review_queue_shows_seeded_drafts(self):
+        """get_needs_review must return seeded drafts with quality scores."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = _make_db(tmp)
+            from src.seed_data import seed_demo_data
+            from src.db import get_needs_review
+            seed_demo_data(db_path)
+            drafts = get_needs_review(db_path)
+            self.assertGreater(len(drafts), 0,
+                               "Review queue must be non-empty after seeding")
+            # At least one draft should have quality scores
+            scored = [d for d in drafts if d.get("quality_status") in ("passed", "failed")]
+            self.assertGreater(len(scored), 0,
+                               "Seeded drafts must have quality status set")
+
+    def test_review_queue_includes_passed_and_failed_drafts(self):
+        """Seeded drafts must include both passed and failed quality examples."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = _make_db(tmp)
+            from src.seed_data import seed_demo_data
+            from src.db import get_needs_review
+            seed_demo_data(db_path)
+            drafts = get_needs_review(db_path)
+            statuses = {d.get("quality_status") for d in drafts}
+            self.assertIn("passed", statuses, "Must include a passed demo draft")
+            self.assertIn("failed", statuses, "Must include a failed demo draft")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 18. --apply and --send-outreach work without config file
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestEarlyExitWithoutConfig(unittest.TestCase):
+
+    def test_apply_via_main_without_config_file(self):
+        """--apply via main() must print REMOVED even when config.yaml does not exist."""
+        from main import main
+        with patch("sys.argv", ["main.py", "--apply",
+                                "--config", "/nonexistent/__missing__.yaml"]):
+            with patch("sys.stdout", new_callable=StringIO) as out:
+                try:
+                    main()
+                except SystemExit:
+                    pass
+            self.assertIn("REMOVED", out.getvalue(),
+                          "--apply must print REMOVED without requiring config.yaml")
+
+    def test_send_outreach_via_main_without_config_file(self):
+        """--send-outreach via main() must print DEPRECATED even when config.yaml is absent."""
+        from main import main
+        with patch("sys.argv", ["main.py", "--send-outreach",
+                                "--config", "/nonexistent/__missing__.yaml"]):
+            with patch("sys.stdout", new_callable=StringIO) as out:
+                try:
+                    main()
+                except SystemExit:
+                    pass
+            self.assertIn("DEPRECATED", out.getvalue(),
+                          "--send-outreach must print DEPRECATED without requiring config.yaml")
+
+    def test_seed_via_main_creates_records(self):
+        """--seed-demo-data via main() must create records without a real config."""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, "copilot.db")
+            # Minimal config — only paths.database, no API keys required
+            cfg_path = os.path.join(tmp, "config.yaml")
+            with open(cfg_path, "w") as f:
+                f.write(f"paths:\n  database: {db_path}\n")
+            from main import main
+            with patch("sys.argv", ["main.py", "--seed-demo-data",
+                                    "--config", cfg_path]):
+                with patch("sys.stdout", new_callable=StringIO):
+                    try:
+                        main()
+                    except SystemExit:
+                        pass
+            from src.db import get_jobs_by_status
+            jobs = get_jobs_by_status(db_path, "scored")
+            self.assertGreater(len(jobs), 0,
+                               "--seed-demo-data must create scored jobs in the DB")
 
 
 if __name__ == "__main__":

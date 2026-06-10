@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-CorosDev Opportunity Copilot
-------------------------------
-A human-in-the-loop assistant for finding, qualifying, and reaching out to
-job opportunities and client prospects.
+DobryBot
+---------
+Human-in-the-loop opportunity and growth assistant for CorosDev.
+Finds, scores, and manages job opportunities and client leads.
+Generates reviewable drafts. Never sends or applies automatically.
 
 Nothing is sent or applied without explicit manual review and approval.
 No automation without a human in the loop.
@@ -506,6 +507,36 @@ def cmd_send_approved(config: dict, logger: logging.Logger, dry_run: bool = Fals
         print(f"\n  {errors} email(s) failed. Run --stats to see failed outreach.")
 
 
+# ── Demo data seeder ──────────────────────────────────────────────────────────
+
+def _get_db_for_demo(config_path: str) -> str:
+    """Return db path from config file (raw parse, no validation) or a safe default."""
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+        path = cfg.get("paths", {}).get("database")
+        if path:
+            return path
+    except Exception:
+        pass
+    return "data/copilot.db"
+
+
+def cmd_seed_demo_data(db_path: str) -> None:
+    """Populate the local DB with demo jobs, leads, and drafts. No external calls."""
+    from src.seed_data import seed_demo_data
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    db.initialize_database(db_path)
+    stats = seed_demo_data(db_path)
+    print("\n-- Demo Data Seeded --")
+    for k, v in stats.items():
+        print(f"  {k:20s}: {v}")
+    print("\nNext steps:")
+    print("  python main.py --stats")
+    print("  python main.py --daily-brief")
+    print("  python main.py --review-queue")
+
+
 # ── Legacy commands (kept for backward compatibility) ─────────────────────────
 
 def cmd_apply(config: dict, logger: logging.Logger) -> None:
@@ -517,7 +548,7 @@ def cmd_apply(config: dict, logger: logging.Logger) -> None:
         "║  --apply is REMOVED                                              ║\n"
         "║                                                                  ║\n"
         "║  Automatic LinkedIn application submission has been removed.     ║\n"
-        "║  Use the human-in-the-loop copilot workflow instead:            ║\n"
+        "║  Use the DobryBot human-in-the-loop workflow instead:           ║\n"
         "║                                                                  ║\n"
         "║    bash run.sh --discover-jobs                                   ║\n"
         "║    bash run.sh --score-jobs                                      ║\n"
@@ -581,12 +612,13 @@ def cmd_send_outreach(config: dict, logger: logging.Logger) -> None:
         "║  Nothing was sent. No changes were made.                         ║\n"
         "╚══════════════════════════════════════════════════════════════════╝\n"
     )
-    db_path = config["paths"]["database"]
-    db.initialize_database(db_path)
-    pending = db.get_needs_review(db_path)
-    if pending:
-        print(f"  You have {len(pending)} draft(s) pending review.")
-        print("  Run: bash run.sh --review-queue")
+    db_path = config.get("paths", {}).get("database")
+    if db_path:
+        db.initialize_database(db_path)
+        pending = db.get_needs_review(db_path)
+        if pending:
+            print(f"  You have {len(pending)} draft(s) pending review.")
+            print("  Run: bash run.sh --review-queue")
 
 
 def cmd_export_contacts(config: dict, logger: logging.Logger) -> None:
@@ -620,7 +652,7 @@ def cmd_stats(config: dict, logger: logging.Logger) -> None:
     db.initialize_database(db_path)
     stats = db.get_stats(db_path)
 
-    print("\n── CorosDev Opportunity Copilot — Stats ──")
+    print("\n── DobryBot — Stats ──")
     for key, val in sorted(stats.items()):
         print(f"  {key:35s}: {val}")
 
@@ -637,11 +669,18 @@ def cmd_daily_brief(config: dict, logger: logging.Logger) -> None:
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
+    # Ensure UTF-8 output on Windows so box-drawing chars render correctly
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
     parser = argparse.ArgumentParser(
-        description="CorosDev Opportunity Copilot — human-in-the-loop job & client assistant",
+        description="DobryBot — human-in-the-loop opportunity and growth assistant",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-━━ COPILOT WORKFLOW (recommended) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━ DOBRYBOT WORKFLOW (recommended) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Jobs:
     --discover-jobs           Load jobs from CSV, save as discovered
@@ -666,6 +705,7 @@ def main():
   Utilities:
     --export-contacts         Export contacts to CSV
     --export-outreach         Export outreach drafts to CSV
+    --seed-demo-data          Seed DB with safe fake data for local testing
 
 ━━ LEGACY (disabled or redirected by default) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -703,6 +743,8 @@ def main():
     parser.add_argument("--export-contacts",        action="store_true")
     parser.add_argument("--export-outreach",        action="store_true")
     parser.add_argument("--stats",                  action="store_true")
+    parser.add_argument("--seed-demo-data",         action="store_true",
+                        help="Seed the local DB with safe demo data for testing")
 
     # Global flags
     parser.add_argument("--dry-run",   action="store_true", help="Preview without saving")
@@ -719,6 +761,28 @@ def main():
     command_flags = {k: v for k, v in vars(args).items() if k not in _non_command}
     if not any(v for v in command_flags.values() if v):
         parser.print_help()
+        return
+
+    # Early exits — these commands work without a full validated config
+    if args.apply:
+        cmd_apply({}, logging.getLogger(__name__))
+        return
+    if args.send_outreach:
+        cmd_send_outreach({}, logging.getLogger(__name__))
+        return
+    if args.seed_demo_data:
+        cmd_seed_demo_data(_get_db_for_demo(args.config))
+        return
+    if args.stats or args.daily_brief or args.review_queue:
+        _db = _get_db_for_demo(args.config)
+        _log = logging.getLogger(__name__)
+        _cfg = {"paths": {"database": _db}}
+        if args.stats:
+            cmd_stats(_cfg, _log)
+        if args.daily_brief:
+            cmd_daily_brief(_cfg, _log)
+        if args.review_queue:
+            cmd_review_queue(_cfg, _log, filter_type=args.type)
         return
 
     config = load_config(args.config)
@@ -738,32 +802,22 @@ def main():
         cmd_score_leads(config, logger, dry_run=dry)
     if args.draft_client_outreach:
         cmd_draft_client_outreach(config, logger, dry_run=dry, min_score=args.min_score)
-    if args.review_queue:
-        cmd_review_queue(config, logger, filter_type=args.type)
     if args.approve:
         cmd_approve(config, logger, args.approve)
     if args.approve_force:
         cmd_approve(config, logger, args.approve_force, force=True)
     if args.send_approved:
         cmd_send_approved(config, logger, dry_run=dry)
-    if args.daily_brief:
-        cmd_daily_brief(config, logger)
 
     # Legacy
-    if args.apply:
-        cmd_apply(config, logger)
     if args.find_emails:
         cmd_find_emails(config, logger)
     if args.generate_outreach:
         cmd_generate_outreach(config, logger)
-    if args.send_outreach:
-        cmd_send_outreach(config, logger)
     if args.export_contacts:
         cmd_export_contacts(config, logger)
     if args.export_outreach:
         cmd_export_outreach(config, logger)
-    if args.stats:
-        cmd_stats(config, logger)
 
 
 if __name__ == "__main__":

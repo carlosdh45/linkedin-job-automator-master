@@ -34,3 +34,5 @@ Thumbs.db
 *.swo
 .idea/
 .vscode/
+
+profile.yaml

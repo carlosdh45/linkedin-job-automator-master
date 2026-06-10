@@ -1,0 +1,95 @@
+# DobryBot — User Profile
+#
+# Copy to profile.yaml and fill in your real information.
+# profile.yaml is git-ignored and never committed.
+#
+# This profile is used to personalize:
+#   - Job fit scoring
+#   - Lead scoring against your ICP
+#   - Draft message generation
+#   - Daily brief recommendations
+
+name: Carlos Hernandez
+location: Honduras / LATAM
+availability: Remote — open to async collaboration across US time zones
+
+target_roles:
+  - IT Project Manager
+  - Delivery Lead
+  - Technical Project Manager
+  - Product Manager
+  - Solution Architect
+  - AI Automation Project Lead
+  - Frontend Lead
+  - AEM Lead
+  - Fullstack Engineer
+
+skills:
+  - Project Management
+  - Agile / Scrum
+  - Software Engineering
+  - Frontend Development
+  - Vue.js
+  - React
+  - AEM (Adobe Experience Manager)
+  - Salesforce project coordination
+  - API testing
+  - Workflow automation
+  - AI tools integration
+  - Stakeholder management
+  - Technical documentation
+  - Software delivery
+
+seniority: Senior / Lead
+years_experience: 7+
+languages:
+  - Spanish (native)
+  - English (professional)
+
+career_goals:
+  - Grow into senior delivery or architecture roles
+  - Build client relationships for nearshore consulting
+  - Lead cross-functional teams across US and LATAM
+  - Increase income through high-value remote roles or client contracts
+
+business:
+  company_name: CorosDev
+  tagline: Nearshore software, automation, and AI-powered tools for US businesses
+  positioning: Nearshore software, automation, CRM, ecommerce, internal tools, and AI-powered business solutions
+  founded: 2023
+  location: Honduras / LATAM
+
+  ideal_clients:
+    - US small and mid-sized businesses
+    - real estate companies
+    - professional services firms
+    - startups
+    - restaurants and hospitality
+    - local businesses going digital
+    - law firms and clinics
+
+  services:
+    - CRM implementation and customization
+    - workflow automation
+    - websites and landing pages
+    - ecommerce development
+    - internal tools and dashboards
+    - API integrations
+    - AI-powered business tools
+    - lead generation systems
+    - digital process automation
+
+  typical_ticket_range: "$2,000 – $15,000 per project"
+  team_size: 2–5
+  engagement_model: Project-based or retainer
+
+outreach_preferences:
+  style: founder_direct
+  max_follow_ups: 2
+  preferred_channels:
+    - email
+    - linkedin_dm
+  avoid:
+    - cold calling
+    - mass sending
+    - generic templates

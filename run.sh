@@ -1,56 +1,68 @@
 #!/usr/bin/env bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# CorosDev Opportunity Copilot — run script (WSL / Ubuntu)
+# CorosDev Opportunity Copilot — runner
 #
-# COPILOT WORKFLOW (human-in-the-loop — nothing sent without approval):
-#   bash run.sh --discover-jobs            # load jobs from CSV, no applying
-#   bash run.sh --score-jobs               # score 0-100 by skill/location fit
-#   bash run.sh --draft-job-application    # generate drafts (Claude, no send)
-#   bash run.sh --review-queue             # review + approve interactively
-#   bash run.sh --approve 42               # approve draft #42 after reading it
-#   bash run.sh --send-approved            # send ONLY approved items (+ confirmation)
-#   bash run.sh --daily-brief              # summary of top jobs, leads, actions
-#
-# LEADS / CLIENTS:
-#   bash run.sh --discover-leads
-#   bash run.sh --score-leads
-#   bash run.sh --draft-client-outreach
-#   bash run.sh --review-queue --type client
-#
-# SAFE PREVIEW (writes nothing, makes no external calls):
-#   bash run.sh --discover-jobs --dry-run
-#   bash run.sh --score-jobs --dry-run
-#   bash run.sh --draft-job-application --dry-run
-#
-# TESTS (run before using real data):
+# Usage:
+#   bash run.sh --help
 #   bash run.sh --test
-#   bash run.sh --test -v
+#   bash run.sh --seed-demo-data
+#   bash run.sh --daily-brief
+#   bash run.sh --discover-jobs --dry-run
+#   bash run.sh --review-queue
 #
-# UTILITIES:
-#   bash run.sh --stats
-#   bash run.sh --export-contacts
-#   bash run.sh --export-outreach
+# SAFETY RULES:
+#   Nothing is sent or applied without explicit --approve + --send-approved.
+#   --apply is removed. --send-outreach does not send.
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 set -e
-export PATH="$PATH:/home/$(whoami)/.local/bin"
+
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export PYTHONPATH="$PROJECT_DIR"
 export PYTHONUTF8=1
 cd "$PROJECT_DIR"
 
-# Auto-load .env if present (never required — use ${ENV_VAR} in config.yaml)
-if [ -f .env ]; then
+# ── Python resolution: prefer .venv, then system python3 ──────────────────────
+if [ -f "$PROJECT_DIR/.venv/bin/python" ]; then
+    PYTHON="$PROJECT_DIR/.venv/bin/python"
+elif command -v python3 &>/dev/null; then
+    PYTHON="python3"
+    # Warn if using system python (not venv)
+    if [ "$1" != "--test" ] && [ "$1" != "--help" ] && [ -z "$COPILOT_SKIP_VENV_WARN" ]; then
+        echo "⚠  Warning: .venv not found. Using system python3." >&2
+        echo "   Run 'bash install.sh' to set up a proper virtual environment." >&2
+        echo "   (Set COPILOT_SKIP_VENV_WARN=1 to suppress this message)" >&2
+        echo "" >&2
+    fi
+else
+    echo "ERROR: Python not found." >&2
+    echo "  Run 'bash install.sh' to set up the project first." >&2
+    exit 1
+fi
+
+# ── Sanity check: verify key dependencies are importable ─────────────────────
+if [ "$1" != "--test" ]; then
+    if ! "$PYTHON" -c "import yaml, anthropic" 2>/dev/null; then
+        echo "ERROR: Required dependencies not installed." >&2
+        echo "  Run 'bash install.sh' to install them." >&2
+        exit 1
+    fi
+fi
+
+# ── Auto-load .env (never commits secrets) ───────────────────────────────────
+if [ -f "$PROJECT_DIR/.env" ]; then
     set -a
     # shellcheck disable=SC1091
-    source .env
+    source "$PROJECT_DIR/.env"
     set +a
 fi
 
+# ── Test shortcut ─────────────────────────────────────────────────────────────
 if [ "$1" = "--test" ]; then
     shift
     echo "Running CorosDev Opportunity Copilot test suite..."
-    python3 -m pytest tests/ -v "$@"
+    "$PYTHON" -m pytest tests/ -v "$@"
     exit $?
 fi
 
-python3 main.py "$@"
+# ── Run main application ──────────────────────────────────────────────────────
+exec "$PYTHON" main.py "$@"

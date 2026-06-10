@@ -1,7 +1,10 @@
-# CorosDev Opportunity Copilot
+# DobryBot
 
-> A human-in-the-loop assistant for finding and reaching out to job opportunities and client prospects.
-> Built by [CorosDev](https://corosdev.com) for professional use — not a bot, not a spam tool.
+> Human-in-the-loop opportunity and growth assistant for CorosDev.
+> Finds, scores, and manages job opportunities and client leads.
+> Generates reviewable drafts. **Never sends or applies automatically.**
+>
+> Built by [CorosDev](https://corosdev.com) — not a bot, not a spam tool.
 
 ---
 
@@ -23,8 +26,8 @@
 
 | Rule | Enforcement |
 |------|-------------|
-| No auto-apply to LinkedIn | `--apply` is removed — prints a redirect message and exits |
-| No auto-send of emails | `--send-approved` requires manual `--approve ID` first, then types `"yes"` at confirmation |
+| No auto-apply to LinkedIn | `--apply` is removed — prints a redirect and exits |
+| No auto-send of emails | `--send-approved` requires manual `--approve ID` first, then confirms `"yes"` |
 | Quality gate is mandatory | `personalization ≥ 75` / `spam_risk ≤ 35` / `ai_sounding ≤ 40` — no override |
 | Pending/failed drafts are blocked | `quality_status = pending` or `failed` cannot be approved under any circumstances |
 | SMTP failures are tracked | Failed sends are marked `status=failed` with a stored `failure_reason` — never marked as sent |
@@ -39,7 +42,7 @@
 # ── Jobs ──────────────────────────────────────────────────────
 bash run.sh --discover-jobs            # load jobs from CSV
 bash run.sh --score-jobs               # score 0-100 by fit
-bash run.sh --draft-job-application    # generate drafts (Claude, no sending)
+bash run.sh --draft-job-application    # generate drafts (no sending)
 bash run.sh --review-queue             # review each draft interactively
 bash run.sh --approve 42               # approve draft #42 after reading it
 bash run.sh --send-approved            # send only approved items
@@ -56,6 +59,11 @@ bash run.sh --send-approved
 bash run.sh --daily-brief              # top jobs, top leads, pending drafts
 bash run.sh --stats                    # database totals
 
+# ── Demo mode (no API keys needed) ───────────────────────────
+bash run.sh --seed-demo-data           # seed safe fake data for testing
+bash run.sh --daily-brief              # see the brief with demo data
+bash run.sh --review-queue             # see demo drafts with quality scores
+
 # ── Safe preview (no writes, no external calls) ───────────────
 bash run.sh --discover-jobs --dry-run
 bash run.sh --score-jobs --dry-run
@@ -66,11 +74,11 @@ bash run.sh --draft-job-application --dry-run
 
 ## Setup
 
-### 1. Clone and install (WSL / Ubuntu)
+### 1. Clone and install
 
 ```bash
-git clone https://github.com/CorosDev/opportunity-copilot
-cd opportunity-copilot
+git clone https://github.com/CorosDev/dobrybot
+cd dobrybot
 bash install.sh
 ```
 
@@ -88,7 +96,7 @@ Required env vars:
 |----------|---------|
 | `ANTHROPIC_API_KEY` | Claude API for draft generation and quality scoring |
 | `HUNTER_API_KEY` | Hunter.io for contact discovery |
-| `LINKEDIN_EMAIL` | LinkedIn login (for session management only) |
+| `LINKEDIN_EMAIL` | LinkedIn login (session management only) |
 | `LINKEDIN_PASSWORD` | LinkedIn login |
 | `SMTP_HOST` | SMTP server for sending approved emails |
 | `SMTP_USER` | SMTP username |
@@ -110,13 +118,13 @@ Set `paths.jobs_csv` in `config.yaml`.
 bash run.sh --test
 ```
 
-All 70 tests pass without any real API keys or external calls.
+All 85 tests pass without any real API keys or external calls.
 
 ---
 
 ## Quality gate
 
-Every draft is scored by Claude (Haiku) before it can be approved:
+Every draft is scored by Claude before it can be approved:
 
 | Dimension | Threshold | What it measures |
 |-----------|-----------|-----------------|
@@ -157,7 +165,7 @@ Drafts are generated in one of 5 styles to avoid AI-sounding text:
 | `client_value_first` | Observation → specific value → low-pressure CTA |
 | `recruiter_friendly` | Candidate to recruiter — specific role, LATAM-aware |
 
-Forbidden phrases are detected and blocked. Generic AI openers ("I hope this finds you well", "I came across your profile", etc.) raise the `ai_sounding_score` automatically.
+Forbidden phrases are detected and blocked. Generic AI openers raise the `ai_sounding_score` automatically.
 
 ---
 
@@ -176,12 +184,27 @@ Items stay in `needs_review` until you explicitly act on them. **Nothing happens
 
 ---
 
+## Demo mode
+
+Try DobryBot without any API keys or credentials:
+
+```bash
+python main.py --seed-demo-data   # load realistic fake jobs, leads, drafts
+python main.py --daily-brief      # see the full brief
+python main.py --review-queue     # browse demo drafts with quality scores
+python main.py --stats            # see pipeline counts
+```
+
+Demo data uses `.test` domains only — zero risk of reaching real people.
+
+---
+
 ## Disabled / deprecated commands
 
 | Command | Status |
 |---------|--------|
-| `--apply` | **Removed.** Prints a redirect message. No LinkedIn session opened. |
-| `--send-outreach` | **Deprecated.** Prints redirect to `--send-approved`. Sends nothing. |
+| `--apply` | **Removed.** Prints a redirect. No LinkedIn session opened. |
+| `--send-outreach` | **Deprecated.** Redirects to `--send-approved`. Sends nothing. |
 | `--generate-outreach` | Still works, saves as `needs_review`. Does not send. |
 | `--find-emails` | Still works. Hunter.io lookup only, no sending. |
 
@@ -200,9 +223,11 @@ Items stay in `needs_review` until you explicitly act on them. **Nothing happens
 │   ├── quality_guard.py       # Claude quality scoring (personalization/spam/AI)
 │   ├── review_queue.py        # Interactive terminal review queue
 │   ├── daily_brief.py         # Daily summary generator
+│   ├── seed_data.py           # Safe demo data seeder (no external calls)
+│   ├── profile_loader.py      # User profile loading from YAML
 │   ├── answer_generator.py    # Claude outreach generation (prompt-cached)
 │   ├── outreach_generator.py  # Legacy outreach flow
-│   ├── linkedin_applier.py    # LinkedIn session + Easy Apply (disabled by default)
+│   ├── linkedin_applier.py    # LinkedIn session flow (disabled by default)
 │   ├── job_filter.py          # CSV filtering
 │   ├── email_finder.py        # Hunter.io integration (1 request/domain)
 │   └── cv_parser.py           # PDF CV extraction
@@ -210,21 +235,24 @@ Items stay in `needs_review` until you explicitly act on them. **Nothing happens
 │   ├── jobs/                  # recruiter_message.md, cover_letter_short.md
 │   └── clients/               # first_touch_email.md, follow_up_1.md, follow_up_2.md
 ├── tests/
-│   ├── test_copilot.py        # 70 tests, all mocked, no real API calls
+│   ├── test_copilot.py        # 85 tests, all mocked, no real API calls
 │   └── fixtures/              # sample_jobs.csv, test_config.yaml
 ├── config.example.yaml        # Config template with ${ENV_VAR} references
+├── profile.example.yaml       # User profile template
 ├── .env.example               # Secret template
 ├── install.sh                 # First-time setup
 ├── run.sh                     # Main runner + test shortcut
-├── requirements.txt
-└── ROADMAP.md
+├── ARCHITECTURE.md            # System architecture and launch-ready design
+├── LAUNCH_PLAN.md             # Phased launch plan
+├── ROADMAP.md                 # Feature roadmap
+└── requirements.txt
 ```
 
 ---
 
 ## Privacy & compliance
 
-- Contact emails from Hunter.io are stored in `data/jobs.db` — treat as sensitive (GDPR-relevant)
+- Contact emails from Hunter.io are stored locally — treat as sensitive (GDPR-relevant)
 - Every client email includes an opt-out line
 - Follow-up cadence is max 2 messages; after follow-up #2, leads are archived
 - LinkedIn session cookies live in `session/` (git-ignored, never committed)
