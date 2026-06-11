@@ -1,0 +1,37 @@
+import type { Stats, Job, Lead, Draft, DailyBrief } from '~/types'
+
+export const useApi = () => {
+  const config = useRuntimeConfig()
+  const base = config.public.apiBase as string
+
+  function get<T>(path: string): Promise<T> {
+    return $fetch<T>(`${base}${path}`)
+  }
+
+  function post<T>(path: string, body?: unknown): Promise<T> {
+    return $fetch<T>(`${base}${path}`, { method: 'POST', body: body ?? {} })
+  }
+
+  return {
+    getHealth: () => get<{ status: string }>('/health'),
+    getStats: () => get<Stats>('/api/stats'),
+    getDailyBrief: () => get<DailyBrief>('/api/daily-brief'),
+    getJobs: (status?: string) =>
+      get<{ jobs: Job[]; total: number }>(
+        status ? `/api/jobs?status=${encodeURIComponent(status)}` : '/api/jobs'
+      ),
+    getLeads: (status?: string) =>
+      get<{ leads: Lead[]; total: number }>(
+        status ? `/api/leads?status=${encodeURIComponent(status)}` : '/api/leads'
+      ),
+    getReviewQueue: () => get<{ drafts: Draft[]; total: number }>('/api/review-queue'),
+    approveDraft: (id: number) =>
+      post<{ approved: boolean; reason?: string }>(`/api/drafts/${id}/approve`),
+    skipDraft: (id: number, reason?: string) =>
+      post<{ skipped: boolean }>(`/api/drafts/${id}/skip`, reason ? { reason } : undefined),
+    markNeedsResearch: (id: number, note?: string) =>
+      post<{ updated: boolean }>(`/api/drafts/${id}/needs-research`, note ? { note } : undefined),
+    seedDemo: () => post<{ seeded: boolean; stats: Record<string, number> }>('/api/demo/seed'),
+    clearDemo: () => post<{ cleared: boolean }>('/api/demo/clear'),
+  }
+}

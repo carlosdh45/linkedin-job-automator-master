@@ -36,3 +36,9 @@ Thumbs.db
 .vscode/
 
 profile.yaml
+
+# ── Frontend (Nuxt) ────────────────────────────────────────────────────────────
+frontend/.nuxt/
+frontend/.output/
+frontend/dist/
+frontend/node_modules/
