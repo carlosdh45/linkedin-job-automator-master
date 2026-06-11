@@ -78,6 +78,48 @@ export interface Draft {
   failure_reason: string
 }
 
+export interface CandidateProfile {
+  id: string
+  full_name: string
+  email: string
+  target_roles: string[]
+  seniority: string
+  preferred_locations: string[]
+  remote_preference: string
+  salary_expectation: string
+  linkedin_url: string
+  portfolio_url: string
+  github_url: string
+  key_skills: string[]
+  industries_of_interest: string[]
+  resume_filename: string | null
+  resume_original_filename: string | null
+  resume_uploaded_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProfileUpdate {
+  full_name?: string
+  email?: string
+  target_roles?: string[]
+  seniority?: string
+  preferred_locations?: string[]
+  remote_preference?: string
+  salary_expectation?: string
+  linkedin_url?: string
+  portfolio_url?: string
+  github_url?: string
+  key_skills?: string[]
+  industries_of_interest?: string[]
+}
+
+export interface ResumeInfo {
+  filename: string
+  original_filename: string
+  uploaded_at: string | null
+}
+
 export interface DailyBrief {
   date: string
   stats: Stats

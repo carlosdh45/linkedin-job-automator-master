@@ -16,3 +16,11 @@ def get_db_path() -> str:
     except Exception:
         pass
     return "data/copilot.db"
+
+
+def get_profile_path() -> str:
+    return os.environ.get("DOBRYBOT_PROFILE_PATH", "data/profile.json")
+
+
+def get_uploads_path() -> str:
+    return os.environ.get("DOBRYBOT_UPLOADS_PATH", "uploads")

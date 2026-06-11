@@ -1,6 +1,8 @@
 # ── Secrets & credentials (NEVER commit these) ────────────────────────────────
 .env
 config.yaml
+data/account.json
+data/profile.json
 
 # ── Runtime data ───────────────────────────────────────────────────────────────
 data/
@@ -36,6 +38,9 @@ Thumbs.db
 .vscode/
 
 profile.yaml
+
+# ── Uploaded files (NEVER commit user uploads) ─────────────────────────────────
+uploads/
 
 # ── Frontend (Nuxt) ────────────────────────────────────────────────────────────
 frontend/.nuxt/

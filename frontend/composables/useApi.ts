@@ -1,4 +1,4 @@
-import type { Stats, Job, Lead, Draft, DailyBrief } from '~/types'
+import type { Stats, Job, Lead, Draft, DailyBrief, CandidateProfile, ProfileUpdate, ResumeInfo } from '~/types'
 
 export const useApi = () => {
   const config = useRuntimeConfig()
@@ -10,6 +10,10 @@ export const useApi = () => {
 
   function post<T>(path: string, body?: unknown): Promise<T> {
     return $fetch<T>(`${base}${path}`, { method: 'POST', body: body ?? {} })
+  }
+
+  function put<T>(path: string, body?: unknown): Promise<T> {
+    return $fetch<T>(`${base}${path}`, { method: 'PUT', body: body ?? {} })
   }
 
   return {
@@ -33,5 +37,17 @@ export const useApi = () => {
       post<{ updated: boolean }>(`/api/drafts/${id}/needs-research`, note ? { note } : undefined),
     seedDemo: () => post<{ seeded: boolean; stats: Record<string, number> }>('/api/demo/seed'),
     clearDemo: () => post<{ cleared: boolean }>('/api/demo/clear'),
+    // Profile
+    getProfile: () => get<CandidateProfile>('/api/profile'),
+    updateProfile: (updates: ProfileUpdate) => put<CandidateProfile>('/api/profile', updates),
+    getResumeInfo: () => get<ResumeInfo>('/api/profile/resume'),
+    uploadResume: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return $fetch<{ uploaded: boolean; filename: string; original_filename: string }>(
+        `${base}/api/profile/resume`,
+        { method: 'POST', body: form }
+      )
+    },
   }
 }
