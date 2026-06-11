@@ -24,3 +24,11 @@ def get_profile_path() -> str:
 
 def get_uploads_path() -> str:
     return os.environ.get("DOBRYBOT_UPLOADS_PATH", "uploads")
+
+
+def get_resume_profile_path() -> str:
+    return os.environ.get("DOBRYBOT_RESUME_PROFILE_PATH", "data/resume_profile.json")
+
+
+def get_resume_preview_path() -> str:
+    return os.environ.get("DOBRYBOT_RESUME_PREVIEW_PATH", "data/resume_preview.md")

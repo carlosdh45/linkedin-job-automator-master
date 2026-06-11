@@ -10,6 +10,10 @@ session/
 logs/
 exports/
 
+# ── Resume Studio data (never commit — local dev only) ─────────────────────────
+data/resume_profile.json
+data/resume_preview.md
+
 # ── SQLite ─────────────────────────────────────────────────────────────────────
 *.db
 *.db-wal

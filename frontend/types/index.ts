@@ -120,6 +120,53 @@ export interface ResumeInfo {
   uploaded_at: string | null
 }
 
+// ── Resume Studio structured profile ─────────────────────────────────────────
+
+export interface ResumeExperienceItem {
+  company: string
+  title: string
+  location: string
+  start_date: string
+  end_date: string
+  currently_working: boolean
+  bullets: string[]
+}
+
+export interface ResumeProjectItem {
+  name: string
+  description: string
+  technologies: string[]
+  bullets: string[]
+}
+
+export interface ResumeEducationItem {
+  institution: string
+  degree: string
+  dates: string
+}
+
+export interface ResumeProfile {
+  headline: string
+  professional_summary: string
+  target_role: string
+  location: string
+  email: string
+  phone: string
+  linkedin_url: string
+  portfolio_url: string
+  github_url: string
+  skills: string[]
+  experience_items: ResumeExperienceItem[]
+  project_items: ResumeProjectItem[]
+  education_items: ResumeEducationItem[]
+  certifications: string[]
+  languages: string[]
+  achievements: string[]
+  updated_at: string
+}
+
+export type ResumeProfileUpdate = Partial<Omit<ResumeProfile, 'updated_at'>>
+
 export interface DailyBrief {
   date: string
   stats: Stats

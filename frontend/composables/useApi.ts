@@ -1,4 +1,4 @@
-import type { Stats, Job, Lead, Draft, DailyBrief, CandidateProfile, ProfileUpdate, ResumeInfo } from '~/types'
+import type { Stats, Job, Lead, Draft, DailyBrief, CandidateProfile, ProfileUpdate, ResumeInfo, ResumeProfile, ResumeProfileUpdate } from '~/types'
 
 export const useApi = () => {
   const config = useRuntimeConfig()
@@ -49,5 +49,10 @@ export const useApi = () => {
         { method: 'POST', body: form }
       )
     },
+    // Resume Studio
+    getResumeProfile: () => get<ResumeProfile>('/api/resume/profile'),
+    updateResumeProfile: (updates: ResumeProfileUpdate) => put<ResumeProfile>('/api/resume/profile', updates),
+    generateResumeDraft: () => post<{ generated: boolean; preview: string }>('/api/resume/generate'),
+    getResumePreview: () => get<{ preview: string; has_content: boolean }>('/api/resume/preview'),
   }
 }

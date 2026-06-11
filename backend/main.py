@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src import db as src_db
-from backend.api import auth, daily_brief, demo, health, jobs, leads, profile, review, stats
+from backend.api import auth, daily_brief, demo, health, jobs, leads, profile, resume, review, stats
 
 logger = logging.getLogger(__name__)
 
@@ -44,4 +44,5 @@ app.include_router(leads.router, prefix="/api")
 app.include_router(review.router, prefix="/api")
 app.include_router(demo.router, prefix="/api")
 app.include_router(profile.router, prefix="/api")
+app.include_router(resume.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
