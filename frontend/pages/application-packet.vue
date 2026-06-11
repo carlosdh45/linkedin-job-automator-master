@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ApplicationPacket, ApplicationPacketUpdate, ChecklistItem } from '~/types'
+import type { ApplicationPacket, ApplicationPacketUpdate, ChecklistItem, ResumeQualityReport } from '~/types'
 
 const api = useApi()
 
@@ -10,6 +10,9 @@ const saving = ref(false)
 const saveResult = ref<'idle' | 'success' | 'error'>('idle')
 const generating = ref(false)
 const generateError = ref('')
+
+// ── Resume readiness ──────────────────────────────────────────────────────────
+const resumeQuality = ref<ResumeQualityReport | null>(null)
 
 const packet = ref<ApplicationPacket>({
   target_job_title: '',
@@ -49,6 +52,12 @@ async function load() {
     loadError.value = true
   } finally {
     loading.value = false
+  }
+  // Load resume quality silently (non-blocking)
+  try {
+    resumeQuality.value = await api.getResumeQuality()
+  } catch {
+    // non-critical
   }
 }
 
@@ -164,6 +173,49 @@ function formatDate(iso: string | null) {
       </div>
 
       <div class="flex-1 p-6 max-w-5xl mx-auto w-full space-y-5">
+
+        <!-- ── Resume Readiness Status ────────────────────────────────────── -->
+        <div v-if="resumeQuality" class="rounded-xl border px-4 py-3 flex items-center gap-4" :class="{
+          'bg-emerald-50 border-emerald-100': resumeQuality.completeness_score >= 80,
+          'bg-blue-50 border-blue-100':       resumeQuality.completeness_score >= 60 && resumeQuality.completeness_score < 80,
+          'bg-amber-50 border-amber-100':     resumeQuality.completeness_score >= 40 && resumeQuality.completeness_score < 60,
+          'bg-gray-50 border-gray-200':       resumeQuality.completeness_score < 40,
+        }">
+          <div class="flex-shrink-0">
+            <div class="h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm" :class="{
+              'bg-emerald-100 text-emerald-700': resumeQuality.completeness_score >= 80,
+              'bg-blue-100 text-blue-700':       resumeQuality.completeness_score >= 60 && resumeQuality.completeness_score < 80,
+              'bg-amber-100 text-amber-700':     resumeQuality.completeness_score >= 40 && resumeQuality.completeness_score < 60,
+              'bg-gray-100 text-gray-500':       resumeQuality.completeness_score < 40,
+            }">{{ resumeQuality.completeness_score }}%</div>
+          </div>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-gray-900">
+              Resume readiness:
+              <span :class="{
+                'text-emerald-600': resumeQuality.completeness_score >= 80,
+                'text-blue-600':    resumeQuality.completeness_score >= 60 && resumeQuality.completeness_score < 80,
+                'text-amber-600':   resumeQuality.completeness_score >= 40 && resumeQuality.completeness_score < 60,
+                'text-gray-500':    resumeQuality.completeness_score < 40,
+              }">
+                {{ resumeQuality.completeness_score >= 80 ? 'Excellent' : resumeQuality.completeness_score >= 60 ? 'Good' : resumeQuality.completeness_score >= 40 ? 'Fair' : 'Incomplete' }}
+              </span>
+            </p>
+            <p v-if="resumeQuality.missing_sections.length > 0" class="text-xs text-gray-500 mt-0.5">
+              Missing: {{ resumeQuality.missing_sections.slice(0, 4).join(', ') }}{{ resumeQuality.missing_sections.length > 4 ? ` +${resumeQuality.missing_sections.length - 4} more` : '' }}
+            </p>
+            <p v-else class="text-xs text-emerald-600 mt-0.5">All key sections complete</p>
+          </div>
+          <NuxtLink
+            to="/resume"
+            class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
+          >
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+            </svg>
+            Edit Resume
+          </NuxtLink>
+        </div>
 
         <!-- ── Top row: Target + Status ───────────────────────────────────── -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">

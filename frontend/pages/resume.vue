@@ -8,110 +8,76 @@ import type {
   ResumeInfo,
   CVImportPreview,
   CVImportApplyRequest,
+  ResumeTone,
 } from '~/types'
 
 const api = useApi()
 
 // ── Load state ────────────────────────────────────────────────────────────────
-const loading = ref(true)
-const loadError = ref(false)
-const saving = ref(false)
+const loading    = ref(true)
+const loadError  = ref(false)
+const saving     = ref(false)
 const saveResult = ref<'idle' | 'success' | 'error'>('idle')
 const generating = ref(false)
 const previewContent = ref('')
-const copied = ref(false)
+const copied     = ref(false)
+const copiedPlain = ref(false)
 
-// ── CV upload state ────────────────────────────────────────────────────────────
-const resumeInfo = ref<ResumeInfo | null>(null)
-const selectedFile = ref<File | null>(null)
-const dragOver = ref(false)
-const uploading = ref(false)
-const uploadResult = ref<'idle' | 'success' | 'error'>('idle')
-const uploadError = ref('')
+// ── Tone ──────────────────────────────────────────────────────────────────────
+const tone = ref<ResumeTone>('professional')
 
-// ── CV Import state ────────────────────────────────────────────────────────────
-const importTab = ref<'upload' | 'paste'>('upload')
-const pasteText = ref('')
-const extracting = ref(false)
-const extractedText = ref('')
-const analyzing = ref(false)
-const importPreview = ref<CVImportPreview | null>(null)
+// ── CV upload state ───────────────────────────────────────────────────────────
+const resumeInfo     = ref<ResumeInfo | null>(null)
+const selectedFile   = ref<File | null>(null)
+const dragOver       = ref(false)
+const uploading      = ref(false)
+const uploadResult   = ref<'idle' | 'success' | 'error'>('idle')
+const uploadError    = ref('')
+
+// ── CV Import state ───────────────────────────────────────────────────────────
+const importTab         = ref<'upload' | 'paste'>('upload')
+const pasteText         = ref('')
+const extracting        = ref(false)
+const extractedText     = ref('')
+const analyzing         = ref(false)
+const importPreview     = ref<CVImportPreview | null>(null)
 const importAnalyzeError = ref('')
-const applyingImport = ref(false)
-const applyResult = ref<'idle' | 'success' | 'error'>('idle')
-const applyFields = ref<string[]>([])
+const applyingImport    = ref(false)
+const applyResult       = ref<'idle' | 'success' | 'error'>('idle')
+const applyFields       = ref<string[]>([])
+
+// ── Preview panel state ───────────────────────────────────────────────────────
+const showPreview = ref(false)
 
 // ── Form state ────────────────────────────────────────────────────────────────
 const form = reactive<Omit<ResumeProfile, 'updated_at'>>({
-  headline: '',
+  headline:             '',
   professional_summary: '',
-  target_role: '',
-  location: '',
-  email: '',
-  phone: '',
-  linkedin_url: '',
-  portfolio_url: '',
-  github_url: '',
-  skills: [],
-  experience_items: [],
-  project_items: [],
-  education_items: [],
-  certifications: [],
-  languages: [],
-  achievements: [],
-  raw_cv_notes: '',
+  target_role:          '',
+  location:             '',
+  email:                '',
+  phone:                '',
+  linkedin_url:         '',
+  portfolio_url:        '',
+  github_url:           '',
+  skills:               [],
+  experience_items:     [],
+  project_items:        [],
+  education_items:      [],
+  certifications:       [],
+  languages:            [],
+  achievements:         [],
+  raw_cv_notes:         '',
 })
 
-const skillsInput = ref('')
-const certsText = ref('')
-const langsText = ref('')
-const achievementsText = ref('')
-
-// ── Completion score ──────────────────────────────────────────────────────────
-const completionScore = computed(() => {
-  let pts = 0
-  if (form.headline) pts += 15
-  if (form.professional_summary) pts += 15
-  if (form.email) pts += 10
-  if (form.skills.length > 0) pts += 15
-  if (form.experience_items.length > 0) pts += 20
-  if (form.education_items.length > 0) pts += 10
-  if (form.linkedin_url) pts += 10
-  if (resumeInfo.value) pts += 5
-  return Math.min(pts, 100)
-})
-
-const completionLabel = computed(() => {
-  const s = completionScore.value
-  if (s >= 80) return 'Excellent'
-  if (s >= 60) return 'Good'
-  if (s >= 40) return 'Fair'
-  return 'Getting started'
-})
-
-const completionBarColor = computed(() => {
-  const s = completionScore.value
-  if (s >= 80) return 'bg-emerald-500'
-  if (s >= 60) return 'bg-blue-500'
-  if (s >= 40) return 'bg-amber-500'
-  return 'bg-gray-300'
-})
-
-const missingFields = computed(() => {
-  const m: string[] = []
-  if (!form.headline) m.push('Headline')
-  if (!form.professional_summary) m.push('Summary')
-  if (!form.email) m.push('Email')
-  if (form.skills.length === 0) m.push('Skills')
-  if (form.experience_items.length === 0) m.push('Experience')
-  if (form.education_items.length === 0) m.push('Education')
-  if (!form.linkedin_url) m.push('LinkedIn')
-  return m
-})
+const skillsInput        = ref('')
+const certsText          = ref('')
+const langsText          = ref('')
+const achievementsText   = ref('')
 
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function loadAll() {
-  loading.value = true
+  loading.value   = true
   loadError.value = false
   try {
     const [profileResult, previewResult, infoResult] = await Promise.allSettled([
@@ -122,30 +88,26 @@ async function loadAll() {
 
     if (profileResult.status === 'fulfilled') {
       const p = profileResult.value
-      form.headline = p.headline
+      form.headline             = p.headline
       form.professional_summary = p.professional_summary
-      form.target_role = p.target_role
-      form.location = p.location
-      form.email = p.email
-      form.phone = p.phone
-      form.linkedin_url = p.linkedin_url
-      form.portfolio_url = p.portfolio_url
-      form.github_url = p.github_url
-      form.skills = [...p.skills]
-      form.experience_items = p.experience_items.map(e => ({
-        ...e, bullets: [...e.bullets],
-      }))
-      form.project_items = p.project_items.map(pr => ({
-        ...pr, technologies: [...pr.technologies], bullets: [...pr.bullets],
-      }))
-      form.education_items = p.education_items.map(e => ({ ...e }))
-      form.certifications = [...p.certifications]
-      form.languages = [...p.languages]
-      form.achievements = [...p.achievements]
-      form.raw_cv_notes = p.raw_cv_notes || ''
-      certsText.value = p.certifications.join('\n')
-      langsText.value = p.languages.join('\n')
-      achievementsText.value = p.achievements.join('\n')
+      form.target_role          = p.target_role
+      form.location             = p.location
+      form.email                = p.email
+      form.phone                = p.phone
+      form.linkedin_url         = p.linkedin_url
+      form.portfolio_url        = p.portfolio_url
+      form.github_url           = p.github_url
+      form.skills               = [...p.skills]
+      form.experience_items     = p.experience_items.map(e => ({ ...e, bullets: [...e.bullets] }))
+      form.project_items        = p.project_items.map(pr => ({ ...pr, technologies: [...pr.technologies], bullets: [...pr.bullets] }))
+      form.education_items      = p.education_items.map(e => ({ ...e }))
+      form.certifications       = [...p.certifications]
+      form.languages            = [...p.languages]
+      form.achievements         = [...p.achievements]
+      form.raw_cv_notes         = p.raw_cv_notes || ''
+      certsText.value           = p.certifications.join('\n')
+      langsText.value           = p.languages.join('\n')
+      achievementsText.value    = p.achievements.join('\n')
     } else {
       loadError.value = true
     }
@@ -162,7 +124,6 @@ async function loadAll() {
     loading.value = false
   }
 
-  // Load import preview silently (non-blocking)
   try {
     const p = await api.getImportPreview()
     if (p.has_content) importPreview.value = p
@@ -194,24 +155,12 @@ function removeSkill(idx: number) {
 // ── Experience ────────────────────────────────────────────────────────────────
 function addExperience() {
   form.experience_items.push({
-    company: '',
-    title: '',
-    location: '',
-    start_date: '',
-    end_date: '',
-    currently_working: false,
-    bullets: [],
+    company: '', title: '', location: '',
+    start_date: '', end_date: '', currently_working: false, bullets: [],
   })
 }
-
-function removeExperience(idx: number) {
-  form.experience_items.splice(idx, 1)
-}
-
-function getExpBullets(exp: ResumeExperienceItem): string {
-  return exp.bullets.join('\n')
-}
-
+function removeExperience(idx: number) { form.experience_items.splice(idx, 1) }
+function getExpBullets(exp: ResumeExperienceItem) { return exp.bullets.join('\n') }
 function setExpBullets(exp: ResumeExperienceItem, text: string) {
   exp.bullets = text.split('\n').map(s => s.trim()).filter(Boolean)
 }
@@ -220,64 +169,40 @@ function setExpBullets(exp: ResumeExperienceItem, text: string) {
 function addEducation() {
   form.education_items.push({ institution: '', degree: '', dates: '' })
 }
-
-function removeEducation(idx: number) {
-  form.education_items.splice(idx, 1)
-}
+function removeEducation(idx: number) { form.education_items.splice(idx, 1) }
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 function addProject() {
   form.project_items.push({ name: '', description: '', technologies: [], bullets: [] })
 }
-
-function removeProject(idx: number) {
-  form.project_items.splice(idx, 1)
-}
-
-function getProjBullets(proj: ResumeProjectItem): string {
-  return proj.bullets.join('\n')
-}
-
+function removeProject(idx: number) { form.project_items.splice(idx, 1) }
+function getProjBullets(proj: ResumeProjectItem) { return proj.bullets.join('\n') }
 function setProjBullets(proj: ResumeProjectItem, text: string) {
   proj.bullets = text.split('\n').map(s => s.trim()).filter(Boolean)
 }
-
-function getProjTech(proj: ResumeProjectItem): string {
-  return proj.technologies.join(', ')
-}
-
+function getProjTech(proj: ResumeProjectItem) { return proj.technologies.join(', ') }
 function setProjTech(proj: ResumeProjectItem, text: string) {
   proj.technologies = text.split(',').map(s => s.trim()).filter(Boolean)
 }
 
 // ── Save ──────────────────────────────────────────────────────────────────────
 async function save() {
-  saving.value = true
+  saving.value     = true
   saveResult.value = 'idle'
   try {
-    // Flush textarea-based fields before saving
     form.certifications = certsText.value.split('\n').map(s => s.trim()).filter(Boolean)
-    form.languages = langsText.value.split('\n').map(s => s.trim()).filter(Boolean)
-    form.achievements = achievementsText.value.split('\n').map(s => s.trim()).filter(Boolean)
+    form.languages      = langsText.value.split('\n').map(s => s.trim()).filter(Boolean)
+    form.achievements   = achievementsText.value.split('\n').map(s => s.trim()).filter(Boolean)
 
     const updates: ResumeProfileUpdate = {
-      headline: form.headline,
-      professional_summary: form.professional_summary,
-      target_role: form.target_role,
-      location: form.location,
-      email: form.email,
-      phone: form.phone,
-      linkedin_url: form.linkedin_url,
-      portfolio_url: form.portfolio_url,
-      github_url: form.github_url,
-      skills: form.skills,
-      experience_items: form.experience_items,
-      project_items: form.project_items,
-      education_items: form.education_items,
-      certifications: form.certifications,
-      languages: form.languages,
-      achievements: form.achievements,
-      raw_cv_notes: form.raw_cv_notes,
+      headline: form.headline, professional_summary: form.professional_summary,
+      target_role: form.target_role, location: form.location,
+      email: form.email, phone: form.phone,
+      linkedin_url: form.linkedin_url, portfolio_url: form.portfolio_url, github_url: form.github_url,
+      skills: form.skills, experience_items: form.experience_items,
+      project_items: form.project_items, education_items: form.education_items,
+      certifications: form.certifications, languages: form.languages,
+      achievements: form.achievements, raw_cv_notes: form.raw_cv_notes,
     }
     await api.updateResumeProfile(updates)
     saveResult.value = 'success'
@@ -294,9 +219,10 @@ async function regenerate() {
   generating.value = true
   try {
     await save()
-    const result = await api.generateResumeDraft()
+    const result = await api.generateResumeDraft(tone.value)
     if (result.generated) {
       previewContent.value = result.preview
+      showPreview.value    = true
     }
   } catch {
     // save already sets saveResult
@@ -312,14 +238,14 @@ async function copyDraft() {
     await navigator.clipboard.writeText(previewContent.value)
     copied.value = true
     setTimeout(() => { copied.value = false }, 2500)
-  } catch {
-    // clipboard not available in some dev environments
-  }
+  } catch {}
 }
 
-const copiedPlain = ref(false)
 async function copyPlainText() {
-  const plain = previewContent.value.replace(/#{1,6} /g, '').replace(/[*_`]/g, '').replace(/^- /gm, '• ')
+  const plain = previewContent.value
+    .replace(/#{1,6} /g, '')
+    .replace(/[*_`]/g, '')
+    .replace(/^- /gm, '• ')
   try {
     await navigator.clipboard.writeText(plain)
     copiedPlain.value = true
@@ -327,19 +253,17 @@ async function copyPlainText() {
   } catch {}
 }
 
-function printResume() {
-  window.print()
-}
+function printResume() { window.print() }
 
 // ── CV Import Assistant ────────────────────────────────────────────────────────
 async function extractFromUpload() {
-  extracting.value = true
+  extracting.value      = true
   importAnalyzeError.value = ''
   try {
     const res = await api.extractCvText()
     if (res.extracted && res.text) {
       extractedText.value = res.text
-      importTab.value = 'upload'
+      importTab.value     = 'upload'
     } else {
       importAnalyzeError.value = res.reason || 'Could not extract text — try pasting it manually.'
     }
@@ -356,7 +280,7 @@ async function analyzeLocally() {
     importAnalyzeError.value = 'No text to analyse. Extract from upload or paste CV text first.'
     return
   }
-  analyzing.value = true
+  analyzing.value          = true
   importAnalyzeError.value = ''
   try {
     importPreview.value = await api.importCvText(text)
@@ -370,7 +294,7 @@ async function analyzeLocally() {
 async function applyImport() {
   if (!importPreview.value?.has_content) return
   applyingImport.value = true
-  applyResult.value = 'idle'
+  applyResult.value    = 'idle'
   try {
     const opts: CVImportApplyRequest = {
       apply_email: true, apply_phone: true,
@@ -379,8 +303,8 @@ async function applyImport() {
     }
     const res = await api.applyImport(opts)
     if (res.applied) {
-      applyResult.value = 'success'
-      applyFields.value = res.fields_updated
+      applyResult.value  = 'success'
+      applyFields.value  = res.fields_updated
       await loadAll()
     }
   } catch {
@@ -392,15 +316,15 @@ async function applyImport() {
 
 // ── CV Upload ─────────────────────────────────────────────────────────────────
 const ACCEPTED_EXT = ['.pdf', '.docx']
-const MAX_MB = 5
+const MAX_MB       = 5
 
-function formatBytes(bytes: number): string {
+function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function formatDate(iso: string | null): string {
+function formatDate(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
@@ -419,15 +343,15 @@ function onDrop(e: DragEvent) {
 
 function selectFile(file: File) {
   uploadResult.value = 'idle'
-  uploadError.value = ''
+  uploadError.value  = ''
   const ext = '.' + file.name.split('.').pop()?.toLowerCase()
   if (!ACCEPTED_EXT.includes(ext)) {
-    uploadError.value = `Only PDF and DOCX files are accepted.`
+    uploadError.value  = 'Only PDF and DOCX files are accepted.'
     selectedFile.value = null
     return
   }
   if (file.size > MAX_MB * 1024 * 1024) {
-    uploadError.value = `File too large. Max ${MAX_MB} MB.`
+    uploadError.value  = `File too large. Max ${MAX_MB} MB.`
     selectedFile.value = null
     return
   }
@@ -436,17 +360,17 @@ function selectFile(file: File) {
 
 async function uploadCV() {
   if (!selectedFile.value) return
-  uploading.value = true
+  uploading.value    = true
   uploadResult.value = 'idle'
-  uploadError.value = ''
+  uploadError.value  = ''
   try {
     await api.uploadResume(selectedFile.value)
     uploadResult.value = 'success'
     selectedFile.value = null
-    resumeInfo.value = await api.getResumeInfo()
+    resumeInfo.value   = await api.getResumeInfo()
   } catch {
     uploadResult.value = 'error'
-    uploadError.value = 'Upload failed — is the backend running?'
+    uploadError.value  = 'Upload failed — is the backend running?'
   } finally {
     uploading.value = false
   }
@@ -455,7 +379,7 @@ async function uploadCV() {
 function clearSelection() {
   selectedFile.value = null
   uploadResult.value = 'idle'
-  uploadError.value = ''
+  uploadError.value  = ''
 }
 </script>
 
@@ -463,7 +387,7 @@ function clearSelection() {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader title="Resume Studio" subtitle="Build, organise, and preview your professional resume" />
 
-    <!-- Loading / Error -->
+    <!-- Loading -->
     <div v-if="loading" class="flex-1 flex items-center justify-center p-8">
       <LoadingSpinner label="Loading Resume Studio…" />
     </div>
@@ -479,84 +403,66 @@ function clearSelection() {
     </div>
 
     <template v-else>
+
       <!-- Privacy notice -->
       <div class="px-6 pt-4">
-        <div class="flex items-start gap-3 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 max-w-7xl mx-auto">
+        <div class="flex items-start gap-3 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 max-w-[1600px] mx-auto">
           <svg class="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
           </svg>
           <p class="text-sm text-emerald-700">
-            All resume data is stored <strong>locally only</strong>. Nothing is sent to any external service, API, or AI in this phase.
+            All resume data is stored <strong>locally only</strong>. Nothing is sent to any external service or AI.
           </p>
         </div>
       </div>
 
-      <!-- Completion score bar -->
-      <div class="px-6 pt-4">
-        <div class="max-w-7xl mx-auto">
-          <div class="flex items-center gap-4">
-            <div class="flex-1">
-              <div class="flex items-center justify-between mb-1.5">
-                <span class="text-xs font-semibold text-gray-600">Profile completeness</span>
-                <span class="text-xs font-semibold" :class="{
-                  'text-emerald-600': completionScore >= 80,
-                  'text-blue-600': completionScore >= 60 && completionScore < 80,
-                  'text-amber-600': completionScore >= 40 && completionScore < 60,
-                  'text-gray-400': completionScore < 40,
-                }">{{ completionScore }}% · {{ completionLabel }}</span>
-              </div>
-              <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  class="h-full rounded-full transition-all duration-500"
-                  :class="completionBarColor"
-                  :style="{ width: `${completionScore}%` }"
-                />
-              </div>
-            </div>
-            <div v-if="missingFields.length > 0" class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-xs text-gray-400">Missing:</span>
-              <span
-                v-for="f in missingFields.slice(0, 4)"
-                :key="f"
-                class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500"
-              >{{ f }}</span>
-              <span v-if="missingFields.length > 4" class="text-xs text-gray-400">+{{ missingFields.length - 4 }} more</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- Action bar (Save, Regenerate, Copy, Print, Tone) -->
+      <ResumeActionBar
+        v-model:tone="tone"
+        :saving="saving"
+        :generating="generating"
+        :save-result="saveResult"
+        :copied="copied"
+        :copied-plain="copiedPlain"
+        :has-preview="Boolean(previewContent)"
+        @save="save"
+        @regenerate="regenerate"
+        @copy-markdown="copyDraft"
+        @copy-plain="copyPlainText"
+        @print="printResume"
+      />
 
-      <!-- Two-column layout -->
-      <div class="flex-1 p-6 grid grid-cols-1 xl:grid-cols-2 gap-6 max-w-7xl mx-auto w-full items-start">
+      <!-- Three-column layout -->
+      <div class="flex-1 p-4 xl:p-6 grid grid-cols-1 xl:grid-cols-[280px_1fr_320px] gap-4 xl:gap-5 max-w-[1600px] mx-auto w-full items-start">
 
-        <!-- ── LEFT: Form ──────────────────────────────────────────────────── -->
-        <div class="space-y-5">
+        <!-- ── LEFT: Source CV + Import ────────────────────────────────────── -->
+        <div class="space-y-4">
 
-          <!-- CV Upload card -->
+          <!-- Source CV File -->
           <AppCard>
             <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 class="text-sm font-semibold text-gray-900">Source CV File</h3>
-                <p class="text-xs text-gray-500 mt-0.5">PDF or DOCX · Max 5 MB · Stored locally, never sent</p>
+                <p class="text-xs text-gray-500 mt-0.5">PDF or DOCX · Max 5 MB</p>
               </div>
               <span v-if="resumeInfo" class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Active</span>
               <span v-else class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-400">None</span>
             </div>
-            <div class="px-5 py-4 space-y-3">
-              <!-- Current file info -->
-              <div v-if="resumeInfo" class="flex items-center gap-3 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2.5">
+            <div class="px-4 py-4 space-y-3">
+              <!-- Current file -->
+              <div v-if="resumeInfo" class="flex items-center gap-3 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
                 <svg class="h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-blue-900 truncate">{{ resumeInfo.original_filename }}</p>
-                  <p class="text-xs text-blue-500">Uploaded {{ formatDate(resumeInfo.uploaded_at) }}</p>
+                  <p class="text-xs font-medium text-blue-900 truncate">{{ resumeInfo.original_filename }}</p>
+                  <p class="text-[10px] text-blue-500">{{ formatDate(resumeInfo.uploaded_at) }}</p>
                 </div>
               </div>
 
               <!-- Drop zone -->
               <div
-                class="relative rounded-xl border-2 border-dashed px-5 py-5 text-center transition-colors cursor-pointer"
+                class="relative rounded-xl border-2 border-dashed px-4 py-4 text-center transition-colors cursor-pointer"
                 :class="dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
                 @dragover.prevent="dragOver = true"
                 @dragleave="dragOver = false"
@@ -564,21 +470,21 @@ function clearSelection() {
                 @click="($refs.fileInput as HTMLInputElement).click()"
               >
                 <input ref="fileInput" type="file" accept=".pdf,.docx" class="sr-only" @change="onFileInput" />
-                <svg class="mx-auto h-6 w-6 text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <svg class="mx-auto h-5 w-5 text-gray-300 mb-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                 </svg>
-                <p class="text-sm text-gray-500">Drop file or click to browse</p>
-                <p class="text-xs text-gray-400">PDF or DOCX · Max 5 MB</p>
+                <p class="text-xs text-gray-500">Drop file or click to browse</p>
+                <p class="text-[10px] text-gray-400">PDF or DOCX · Max 5 MB</p>
               </div>
 
               <!-- Selected file -->
-              <div v-if="selectedFile" class="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+              <div v-if="selectedFile" class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
                 <svg class="h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-900 truncate">{{ selectedFile.name }}</p>
-                  <p class="text-xs text-gray-400">{{ formatBytes(selectedFile.size) }}</p>
+                  <p class="text-xs font-medium text-gray-900 truncate">{{ selectedFile.name }}</p>
+                  <p class="text-[10px] text-gray-400">{{ formatBytes(selectedFile.size) }}</p>
                 </div>
                 <button class="text-gray-400 hover:text-gray-600" @click.stop="clearSelection">
                   <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -587,24 +493,23 @@ function clearSelection() {
                 </button>
               </div>
 
-              <!-- Errors / success -->
               <div v-if="uploadError" class="flex items-center gap-2 rounded-lg bg-red-50 border border-red-100 px-3 py-2">
                 <svg class="h-4 w-4 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                 </svg>
-                <span class="text-sm text-red-700">{{ uploadError }}</span>
+                <span class="text-xs text-red-700">{{ uploadError }}</span>
               </div>
               <div v-if="uploadResult === 'success'" class="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2">
                 <svg class="h-4 w-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span class="text-sm text-emerald-700">CV stored locally. Not sent anywhere.</span>
+                <span class="text-xs text-emerald-700">CV stored locally.</span>
               </div>
 
               <div v-if="selectedFile" class="flex justify-end">
                 <button
                   :disabled="uploading"
-                  class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition"
                   @click="uploadCV"
                 >
                   <svg v-if="uploading" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -616,19 +521,19 @@ function clearSelection() {
             </div>
           </AppCard>
 
-          <!-- ── CV Import Assistant ─────────────────────────────────────── -->
+          <!-- CV Import Assistant -->
           <AppCard>
             <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 class="text-sm font-semibold text-gray-900">CV Import Assistant</h3>
-                <p class="text-xs text-gray-500 mt-0.5">Extract text locally → review detected fields → apply to editor</p>
+                <p class="text-xs text-gray-500 mt-0.5">Extract text locally, review, then apply</p>
               </div>
-              <span class="rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Local only</span>
+              <span class="rounded-full bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">Local only</span>
             </div>
-            <div class="px-5 py-4 space-y-4">
+            <div class="px-4 py-4 space-y-4">
 
               <!-- Tab switcher -->
-              <div class="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+              <div class="flex gap-0.5 p-0.5 bg-gray-100 rounded-lg w-fit">
                 <button
                   class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
                   :class="importTab === 'upload' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
@@ -638,16 +543,16 @@ function clearSelection() {
                   class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
                   :class="importTab === 'paste' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
                   @click="importTab = 'paste'"
-                >Paste CV Text</button>
+                >Paste Text</button>
               </div>
 
               <!-- Upload tab -->
               <div v-if="importTab === 'upload'" class="space-y-3">
-                <div v-if="!resumeInfo" class="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5 text-xs text-amber-700">
+                <div v-if="!resumeInfo" class="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-700">
                   Upload a CV file above first, then click "Extract Text".
                 </div>
-                <div v-else class="flex items-center gap-3 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2.5">
-                  <svg class="h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <div v-else class="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
+                  <svg class="h-3.5 w-3.5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                   </svg>
                   <span class="text-xs text-blue-800 font-medium truncate">{{ resumeInfo.original_filename }}</span>
@@ -660,43 +565,33 @@ function clearSelection() {
                   <svg v-if="extracting" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                   </svg>
-                  <svg v-else class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 7.5h-.75A2.25 2.25 0 004.5 9.75v7.5a2.25 2.25 0 002.25 2.25h7.5a2.25 2.25 0 002.25-2.25v-7.5a2.25 2.25 0 00-2.25-2.25h-.75m0-3l-3-3m0 0l-3 3m3-3v11.25m6-2.25h.75a2.25 2.25 0 012.25 2.25v7.5a2.25 2.25 0 01-2.25 2.25h-7.5a2.25 2.25 0 01-2.25-2.25v-.75" />
-                  </svg>
                   {{ extracting ? 'Extracting…' : 'Extract Text from Upload' }}
                 </button>
-                <div v-if="extractedText" class="space-y-1">
-                  <p class="text-xs font-medium text-gray-600">Extracted text preview</p>
-                  <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 max-h-28 overflow-y-auto">
-                    <p class="text-xs text-gray-600 whitespace-pre-wrap font-mono leading-relaxed">{{ extractedText.slice(0, 600) }}{{ extractedText.length > 600 ? '…' : '' }}</p>
-                  </div>
+                <div v-if="extractedText" class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 max-h-24 overflow-y-auto">
+                  <p class="text-[10px] text-gray-600 whitespace-pre-wrap font-mono">{{ extractedText.slice(0, 500) }}{{ extractedText.length > 500 ? '…' : '' }}</p>
                 </div>
               </div>
 
               <!-- Paste tab -->
               <div v-if="importTab === 'paste'" class="space-y-2">
-                <label class="block text-xs font-medium text-gray-600">Paste CV text here</label>
                 <textarea
                   v-model="pasteText"
-                  rows="7"
-                  placeholder="Paste the full text of your CV or resume here. You can copy it from a PDF viewer, Word, or any text editor…"
+                  rows="6"
+                  placeholder="Paste your CV text here…"
                   class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition font-mono resize-none"
                 />
-                <p class="text-xs text-gray-400">Nothing is sent externally. All analysis runs locally.</p>
+                <p class="text-[10px] text-gray-400">All analysis runs locally — nothing sent externally.</p>
               </div>
 
               <!-- Analyse button -->
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2">
                 <button
                   :disabled="analyzing || (importTab === 'upload' ? !extractedText : !pasteText.trim())"
-                  class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition"
+                  class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition"
                   @click="analyzeLocally"
                 >
                   <svg v-if="analyzing" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                  </svg>
-                  <svg v-else class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                   </svg>
                   {{ analyzing ? 'Analysing…' : 'Analyse Locally' }}
                 </button>
@@ -704,96 +599,54 @@ function clearSelection() {
               </div>
 
               <!-- Import Preview -->
-              <div v-if="importPreview?.has_content" class="rounded-xl border border-blue-100 bg-blue-50 p-4 space-y-3">
+              <div v-if="importPreview?.has_content" class="rounded-xl border border-blue-100 bg-blue-50 p-3 space-y-3">
                 <div class="flex items-center justify-between">
-                  <p class="text-xs font-semibold text-blue-900">Import Preview — Review before applying</p>
-                  <span class="text-[10px] text-blue-600 bg-blue-100 rounded-full px-2 py-0.5">Local heuristics only</span>
+                  <p class="text-xs font-semibold text-blue-900">Import Preview</p>
+                  <span class="text-[10px] text-blue-600 bg-blue-100 rounded-full px-2 py-0.5">Local only</span>
                 </div>
-
-                <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                  <div v-if="importPreview.detected_email">
-                    <span class="text-blue-600 font-medium">Email: </span>
-                    <span class="text-blue-900">{{ importPreview.detected_email }}</span>
-                  </div>
-                  <div v-if="importPreview.detected_phone">
-                    <span class="text-blue-600 font-medium">Phone: </span>
-                    <span class="text-blue-900">{{ importPreview.detected_phone }}</span>
-                  </div>
-                  <div v-if="importPreview.detected_linkedin">
-                    <span class="text-blue-600 font-medium">LinkedIn: </span>
-                    <span class="text-blue-900 truncate">{{ importPreview.detected_linkedin }}</span>
-                  </div>
-                  <div v-if="importPreview.detected_github">
-                    <span class="text-blue-600 font-medium">GitHub: </span>
-                    <span class="text-blue-900 truncate">{{ importPreview.detected_github }}</span>
-                  </div>
+                <div class="grid grid-cols-1 gap-y-1 text-xs">
+                  <div v-if="importPreview.detected_email"><span class="text-blue-600 font-medium">Email: </span><span class="text-blue-900">{{ importPreview.detected_email }}</span></div>
+                  <div v-if="importPreview.detected_phone"><span class="text-blue-600 font-medium">Phone: </span><span class="text-blue-900">{{ importPreview.detected_phone }}</span></div>
+                  <div v-if="importPreview.detected_linkedin" class="truncate"><span class="text-blue-600 font-medium">LinkedIn: </span><span class="text-blue-900">{{ importPreview.detected_linkedin }}</span></div>
                 </div>
-
                 <div v-if="importPreview.detected_skills.length > 0">
-                  <p class="text-xs font-medium text-blue-700 mb-1">Detected skills ({{ importPreview.detected_skills.length }})</p>
+                  <p class="text-[10px] font-medium text-blue-700 mb-1">Skills ({{ importPreview.detected_skills.length }})</p>
                   <div class="flex flex-wrap gap-1">
-                    <span
-                      v-for="s in importPreview.detected_skills.slice(0, 20)"
-                      :key="s"
-                      class="rounded-full bg-white border border-blue-200 px-2 py-0.5 text-[10px] text-blue-800"
-                    >{{ s }}</span>
-                    <span v-if="importPreview.detected_skills.length > 20" class="text-[10px] text-blue-500">+{{ importPreview.detected_skills.length - 20 }} more</span>
+                    <span v-for="s in importPreview.detected_skills.slice(0, 12)" :key="s" class="rounded-full bg-white border border-blue-200 px-1.5 py-0.5 text-[10px] text-blue-800">{{ s }}</span>
+                    <span v-if="importPreview.detected_skills.length > 12" class="text-[10px] text-blue-500">+{{ importPreview.detected_skills.length - 12 }} more</span>
                   </div>
                 </div>
-
-                <div v-if="importPreview.detected_experience_headings.length > 0">
-                  <p class="text-xs font-medium text-blue-700 mb-1">Experience headings detected</p>
-                  <ul class="space-y-0.5">
-                    <li v-for="h in importPreview.detected_experience_headings.slice(0, 5)" :key="h" class="text-xs text-blue-800">· {{ h }}</li>
-                    <li v-if="importPreview.detected_experience_headings.length > 5" class="text-xs text-blue-500">+{{ importPreview.detected_experience_headings.length - 5 }} more</li>
-                  </ul>
-                </div>
-
-                <div v-if="importPreview.detected_education_entries.length > 0">
-                  <p class="text-xs font-medium text-blue-700 mb-1">Education detected</p>
-                  <ul class="space-y-0.5">
-                    <li v-for="e in importPreview.detected_education_entries.slice(0, 4)" :key="e" class="text-xs text-blue-800">· {{ e }}</li>
-                  </ul>
-                </div>
-
-                <div v-if="importPreview.detected_certifications.length > 0">
-                  <p class="text-xs font-medium text-blue-700 mb-1">Certifications detected</p>
-                  <ul class="space-y-0.5">
-                    <li v-for="c in importPreview.detected_certifications.slice(0, 5)" :key="c" class="text-xs text-blue-800">· {{ c }}</li>
-                  </ul>
-                </div>
-
-                <!-- Apply result -->
-                <div v-if="applyResult === 'success'" class="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">
+                <div v-if="applyResult === 'success'" class="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-2 py-1.5">
                   <svg class="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span class="text-xs text-emerald-700">Applied to Resume Studio: {{ applyFields.join(', ') || 'no new fields' }}</span>
+                  <span class="text-xs text-emerald-700">Applied: {{ applyFields.join(', ') || 'no new fields' }}</span>
                 </div>
                 <div v-if="applyResult === 'error'" class="text-xs text-red-600">Apply failed — is the backend running?</div>
-
-                <div class="flex items-center gap-2 pt-1">
-                  <button
-                    :disabled="applyingImport"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
-                    @click="applyImport"
-                  >
-                    <svg v-if="applyingImport" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                    </svg>
-                    {{ applyingImport ? 'Applying…' : 'Apply Import to Resume Studio' }}
-                  </button>
-                  <span class="text-[10px] text-gray-400">Only updates empty fields (merges skills & certifications)</span>
-                </div>
+                <button
+                  :disabled="applyingImport"
+                  class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+                  @click="applyImport"
+                >
+                  <svg v-if="applyingImport" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                  {{ applyingImport ? 'Applying…' : 'Apply Import to Editor' }}
+                </button>
               </div>
 
             </div>
           </AppCard>
 
-          <!-- Headline & Basics -->
+        </div>
+
+        <!-- ── CENTER: Resume Editor ────────────────────────────────────────── -->
+        <div class="space-y-4">
+
+          <!-- Identity & Headline -->
           <AppCard>
             <div class="px-5 py-3.5 border-b border-gray-100">
-              <h3 class="text-sm font-semibold text-gray-900">Identity & Headline</h3>
+              <h3 class="text-sm font-semibold text-gray-900">Identity &amp; Headline</h3>
             </div>
             <div class="px-5 py-4 space-y-3.5">
               <div>
@@ -808,70 +661,42 @@ function clearSelection() {
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Target Role</label>
-                  <input
-                    v-model="form.target_role"
-                    type="text"
-                    placeholder="Backend Engineer"
-                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
-                  />
+                  <input v-model="form.target_role" type="text" placeholder="Backend Engineer"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Location</label>
-                  <input
-                    v-model="form.location"
-                    type="text"
-                    placeholder="London, UK"
-                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
-                  />
+                  <input v-model="form.location" type="text" placeholder="London, UK"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
                 </div>
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
-                  <input
-                    v-model="form.email"
-                    type="email"
-                    placeholder="jane@example.com"
-                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
-                  />
+                  <input v-model="form.email" type="email" placeholder="jane@example.com"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Phone</label>
-                  <input
-                    v-model="form.phone"
-                    type="text"
-                    placeholder="+44 7700 900000"
-                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
-                  />
+                  <input v-model="form.phone" type="text" placeholder="+44 7700 900000"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
                 </div>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">LinkedIn URL</label>
-                <input
-                  v-model="form.linkedin_url"
-                  type="url"
-                  placeholder="https://linkedin.com/in/yourname"
-                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
-                />
+                <input v-model="form.linkedin_url" type="url" placeholder="https://linkedin.com/in/yourname"
+                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">GitHub URL</label>
-                  <input
-                    v-model="form.github_url"
-                    type="url"
-                    placeholder="https://github.com/yourname"
-                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
-                  />
+                  <input v-model="form.github_url" type="url" placeholder="https://github.com/yourname"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Portfolio URL</label>
-                  <input
-                    v-model="form.portfolio_url"
-                    type="url"
-                    placeholder="https://yoursite.com"
-                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
-                  />
+                  <input v-model="form.portfolio_url" type="url" placeholder="https://yoursite.com"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
                 </div>
               </div>
             </div>
@@ -879,7 +704,7 @@ function clearSelection() {
 
           <!-- Professional Summary -->
           <AppCard>
-            <div class="px-5 py-3.5 border-b border-gray-100">
+            <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
               <h3 class="text-sm font-semibold text-gray-900">Professional Summary</h3>
             </div>
             <div class="px-5 py-4">
@@ -898,7 +723,6 @@ function clearSelection() {
               <h3 class="text-sm font-semibold text-gray-900">Skills</h3>
             </div>
             <div class="px-5 py-4 space-y-3">
-              <!-- Chip display -->
               <div v-if="form.skills.length > 0" class="flex flex-wrap gap-1.5">
                 <span
                   v-for="(skill, i) in form.skills"
@@ -914,8 +738,6 @@ function clearSelection() {
                 </span>
               </div>
               <div v-else class="text-xs text-gray-400">No skills added yet.</div>
-
-              <!-- Input -->
               <div class="flex gap-2">
                 <input
                   v-model="skillsInput"
@@ -924,14 +746,9 @@ function clearSelection() {
                   class="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
                   @keydown="onSkillsKeydown"
                 />
-                <button
-                  class="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition"
-                  @click="addSkillsFromInput"
-                >
-                  Add
-                </button>
+                <button class="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition" @click="addSkillsFromInput">Add</button>
               </div>
-              <p class="text-xs text-gray-400">Separate multiple skills with commas, or press Enter after each one.</p>
+              <p class="text-xs text-gray-400">Separate with commas or press Enter.</p>
             </div>
           </AppCard>
 
@@ -953,11 +770,7 @@ function clearSelection() {
               <div v-if="form.experience_items.length === 0" class="px-5 py-5 text-center">
                 <p class="text-sm text-gray-400">No experience added. Click "Add Role" to get started.</p>
               </div>
-              <div
-                v-for="(exp, i) in form.experience_items"
-                :key="i"
-                class="px-5 py-4 space-y-3"
-              >
+              <div v-for="(exp, i) in form.experience_items" :key="i" class="px-5 py-4 space-y-3">
                 <div class="flex items-center justify-between">
                   <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Role {{ i + 1 }}</p>
                   <button class="text-xs text-red-400 hover:text-red-600 transition" @click="removeExperience(i)">Remove</button>
@@ -982,14 +795,12 @@ function clearSelection() {
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">End</label>
-                    <input v-model="exp.end_date" type="text" placeholder="2024-06"
-                      :disabled="exp.currently_working"
+                    <input v-model="exp.end_date" type="text" placeholder="2024-06" :disabled="exp.currently_working"
                       class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition disabled:bg-gray-50 disabled:text-gray-400" />
                   </div>
                   <div class="flex items-end pb-2">
                     <label class="flex items-center gap-2 cursor-pointer">
-                      <input v-model="exp.currently_working" type="checkbox"
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                      <input v-model="exp.currently_working" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                       <span class="text-xs text-gray-600">Current</span>
                     </label>
                   </div>
@@ -1004,55 +815,11 @@ function clearSelection() {
                   <textarea
                     :value="getExpBullets(exp)"
                     rows="3"
-                    placeholder="One accomplishment per line — lead with a strong action verb and quantify results…"
+                    placeholder="One accomplishment per line — lead with a strong action verb…"
                     class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition resize-none"
                     @input="setExpBullets(exp, ($event.target as HTMLTextAreaElement).value)"
                   />
                   <p class="text-xs text-gray-400 mt-1">One bullet per line.</p>
-                </div>
-              </div>
-            </div>
-          </AppCard>
-
-          <!-- Education -->
-          <AppCard>
-            <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-gray-900">Education</h3>
-              <button
-                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
-                @click="addEducation"
-              >
-                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-                Add
-              </button>
-            </div>
-            <div class="divide-y divide-gray-100">
-              <div v-if="form.education_items.length === 0" class="px-5 py-5 text-center">
-                <p class="text-sm text-gray-400">No education added yet.</p>
-              </div>
-              <div v-for="(edu, i) in form.education_items" :key="i" class="px-5 py-4 space-y-3">
-                <div class="flex items-center justify-between">
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Entry {{ i + 1 }}</p>
-                  <button class="text-xs text-red-400 hover:text-red-600" @click="removeEducation(i)">Remove</button>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Degree</label>
-                    <input v-model="edu.degree" type="text" placeholder="BSc Computer Science"
-                      class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Institution</label>
-                    <input v-model="edu.institution" type="text" placeholder="University of London"
-                      class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
-                  </div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-600 mb-1">Dates</label>
-                  <input v-model="edu.dates" type="text" placeholder="2017 – 2021"
-                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
                 </div>
               </div>
             </div>
@@ -1115,6 +882,50 @@ function clearSelection() {
             </div>
           </AppCard>
 
+          <!-- Education -->
+          <AppCard>
+            <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-gray-900">Education</h3>
+              <button
+                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+                @click="addEducation"
+              >
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Add
+              </button>
+            </div>
+            <div class="divide-y divide-gray-100">
+              <div v-if="form.education_items.length === 0" class="px-5 py-5 text-center">
+                <p class="text-sm text-gray-400">No education added yet.</p>
+              </div>
+              <div v-for="(edu, i) in form.education_items" :key="i" class="px-5 py-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Entry {{ i + 1 }}</p>
+                  <button class="text-xs text-red-400 hover:text-red-600" @click="removeEducation(i)">Remove</button>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Degree</label>
+                    <input v-model="edu.degree" type="text" placeholder="BSc Computer Science"
+                      class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Institution</label>
+                    <input v-model="edu.institution" type="text" placeholder="University of London"
+                      class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Dates</label>
+                  <input v-model="edu.dates" type="text" placeholder="2017 – 2021"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition" />
+                </div>
+              </div>
+            </div>
+          </AppCard>
+
           <!-- Certs, Languages, Achievements -->
           <AppCard>
             <div class="px-5 py-3.5 border-b border-gray-100">
@@ -1123,52 +934,44 @@ function clearSelection() {
             <div class="px-5 py-4 space-y-4">
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Certifications</label>
-                <textarea v-model="certsText" rows="3" placeholder="AWS Solutions Architect&#10;Google Professional Data Engineer"
+                <textarea v-model="certsText" rows="3"
+                  placeholder="AWS Solutions Architect&#10;Google Professional Data Engineer"
                   class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition resize-none" />
                 <p class="text-xs text-gray-400 mt-1">One per line.</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Languages</label>
-                <textarea v-model="langsText" rows="2" placeholder="English (Native)&#10;Spanish (B2)"
+                <textarea v-model="langsText" rows="2"
+                  placeholder="English (Native)&#10;Spanish (B2)"
                   class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition resize-none" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Key Achievements</label>
-                <textarea v-model="achievementsText" rows="3" placeholder="Led platform migration to microservices serving 2M+ users&#10;Open-source tool with 1.2k GitHub stars"
+                <textarea v-model="achievementsText" rows="3"
+                  placeholder="Led platform migration to microservices&#10;Open-source tool with strong community traction"
                   class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition resize-none" />
               </div>
             </div>
           </AppCard>
 
-          <!-- Raw CV Notes -->
+          <!-- Raw CV Notes (collapsible) -->
           <AppCard>
             <div class="px-5 py-3.5 border-b border-gray-100">
               <h3 class="text-sm font-semibold text-gray-900">Raw CV Notes</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Unstructured text from your CV import — for reference only, not included in the resume draft</p>
+              <p class="text-xs text-gray-500 mt-0.5">Unstructured notes from import — not included in resume draft</p>
             </div>
             <div class="px-5 py-4">
               <textarea
                 v-model="form.raw_cv_notes"
-                rows="5"
-                placeholder="Paste or edit any raw notes, unformatted CV text, or notes to yourself here…"
+                rows="4"
+                placeholder="Paste or edit any raw notes, unformatted CV text, or personal reminders here…"
                 class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition resize-none font-mono text-xs"
               />
             </div>
           </AppCard>
 
-          <!-- Save row -->
-          <div class="flex items-center justify-between pb-4">
-            <transition name="fade">
-              <div v-if="saveResult === 'success'" class="flex items-center gap-1.5 text-sm text-emerald-600">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Profile saved
-              </div>
-              <div v-else-if="saveResult === 'error'" class="text-sm text-red-500">
-                Could not save — is the backend running?
-              </div>
-            </transition>
+          <!-- Save row at bottom of center column -->
+          <div class="flex items-center justify-end pb-4">
             <button
               :disabled="saving"
               class="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-60 transition shadow-sm"
@@ -1183,177 +986,116 @@ function clearSelection() {
               {{ saving ? 'Saving…' : 'Save Profile' }}
             </button>
           </div>
+
         </div>
 
-        <!-- ── RIGHT: Preview ──────────────────────────────────────────────── -->
+        <!-- ── RIGHT: Quality Panel + AI stubs + Preview ───────────────────── -->
         <div class="xl:sticky xl:top-6 space-y-4">
-          <!-- Action bar -->
-          <div class="flex items-center gap-2 flex-wrap">
-            <button
-              :disabled="generating"
-              class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition shadow-sm"
-              @click="regenerate"
-            >
-              <svg v-if="generating" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-              </svg>
-              <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-              </svg>
-              {{ generating ? 'Generating…' : 'Regenerate Draft' }}
-            </button>
 
-            <button
-              :disabled="!previewContent"
-              class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition"
-              @click="copyDraft"
-            >
-              <svg v-if="copied" class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-              </svg>
-              {{ copied ? 'Copied!' : 'Copy Markdown' }}
-            </button>
+          <!-- Quality panel -->
+          <ResumeQualityPanel :form="form" />
 
-            <button
-              :disabled="!previewContent"
-              class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition"
-              @click="copyPlainText"
-            >
-              <svg v-if="copiedPlain" class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-              {{ copiedPlain ? 'Copied!' : 'Copy Plain Text' }}
-            </button>
+          <!-- AI-ready feature stubs -->
+          <AppCard>
+            <div class="px-5 py-3.5 border-b border-gray-100">
+              <h3 class="text-sm font-semibold text-gray-900">AI Assistance</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Coming in a future phase — no AI calls in this version</p>
+            </div>
+            <div class="px-5 py-4 space-y-2">
+              <ResumeSuggestionCard
+                title="Improve Summary with AI"
+                description="Rewrite your summary to sound more compelling"
+              />
+              <ResumeSuggestionCard
+                title="Rewrite Bullet Point"
+                description="Sharpen an experience bullet with better phrasing"
+              />
+              <ResumeSuggestionCard
+                title="Tailor to Job Description"
+                description="Align resume keywords with a specific role"
+              />
+              <ResumeSuggestionCard
+                title="Generate Cover Letter with AI"
+                description="Draft a personalised cover letter from your profile"
+              />
+              <p class="text-[10px] text-gray-400 pt-1 text-center">
+                AI assistance will be added in a future phase with explicit user consent and API configuration.
+              </p>
+            </div>
+          </AppCard>
 
-            <button
-              :disabled="!previewContent"
-              class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition"
-              @click="printResume"
+          <!-- Live Preview (toggle) -->
+          <AppCard>
+            <div
+              class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between cursor-pointer select-none"
+              @click="showPreview = !showPreview"
             >
-              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
-              </svg>
-              Print
-            </button>
-          </div>
-
-          <!-- Preview card -->
-          <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-            <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-gray-900">Live Preview</h3>
-              <span class="text-xs text-gray-400">Markdown draft — click "Regenerate Draft" to refresh</span>
+              <h3 class="text-sm font-semibold text-gray-900">Resume Draft Preview</h3>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-400">{{ previewContent ? 'Markdown' : 'Empty' }}</span>
+                <svg
+                  class="h-4 w-4 text-gray-400 transition-transform duration-200"
+                  :class="showPreview ? 'rotate-180' : ''"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </div>
             </div>
 
-            <!-- Empty state -->
-            <div v-if="!previewContent" class="px-5 py-10 text-center">
-              <svg class="mx-auto h-10 w-10 text-gray-200 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
-              <p class="text-sm font-medium text-gray-500">No draft generated yet</p>
-              <p class="text-xs text-gray-400 mt-1">Fill in your details and click "Regenerate Draft" to create a resume draft.</p>
-            </div>
-
-            <!-- Live preview rendering -->
-            <div v-else class="px-6 py-6 font-mono text-xs leading-relaxed text-gray-700 max-h-[680px] overflow-y-auto">
-              <!-- Header -->
-              <div class="mb-4">
-                <h1 class="text-xl font-bold text-gray-900 font-sans">
-                  {{ form.headline || form.target_role || 'My Resume' }}
-                </h1>
-                <p v-if="form.target_role && form.headline" class="text-sm font-semibold text-blue-700 font-sans mt-0.5">
-                  {{ form.target_role }}
-                </p>
-                <div class="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-gray-500 font-sans">
-                  <span v-if="form.location">{{ form.location }}</span>
-                  <span v-if="form.email">{{ form.email }}</span>
-                  <span v-if="form.phone">{{ form.phone }}</span>
-                  <span v-if="form.linkedin_url" class="text-blue-600">LinkedIn</span>
-                  <span v-if="form.github_url" class="text-gray-600">GitHub</span>
-                </div>
+            <div v-show="showPreview">
+              <div v-if="!previewContent" class="px-5 py-8 text-center">
+                <svg class="mx-auto h-8 w-8 text-gray-200 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+                <p class="text-sm text-gray-400">No draft yet. Click "Regenerate Draft" above.</p>
               </div>
-              <hr class="border-gray-200 my-3" />
-
-              <!-- Summary -->
-              <div v-if="form.professional_summary" class="mb-4">
-                <h2 class="text-xs font-bold text-gray-900 uppercase tracking-wider font-sans mb-1.5">Professional Summary</h2>
-                <p class="text-xs text-gray-700 leading-relaxed font-sans">{{ form.professional_summary }}</p>
-                <hr class="border-gray-200 mt-3" />
-              </div>
-
-              <!-- Skills -->
-              <div v-if="form.skills.length > 0" class="mb-4">
-                <h2 class="text-xs font-bold text-gray-900 uppercase tracking-wider font-sans mb-1.5">Skills</h2>
-                <p class="text-xs text-gray-700 font-sans">{{ form.skills.join(' · ') }}</p>
-                <hr class="border-gray-200 mt-3" />
-              </div>
-
-              <!-- Experience -->
-              <div v-if="form.experience_items.length > 0" class="mb-4">
-                <h2 class="text-xs font-bold text-gray-900 uppercase tracking-wider font-sans mb-2">Experience</h2>
-                <div v-for="(exp, i) in form.experience_items" :key="i" class="mb-3">
-                  <div class="flex items-baseline justify-between">
-                    <p class="text-xs font-bold text-gray-900 font-sans">
-                      {{ exp.title || '(Role)' }}
-                      <span v-if="exp.company"> — {{ exp.company }}</span>
-                    </p>
-                    <span class="text-[10px] text-gray-400 font-sans flex-shrink-0 ml-2">
-                      {{ exp.start_date }}{{ exp.currently_working ? ' – Present' : exp.end_date ? ` – ${exp.end_date}` : '' }}
-                    </span>
+              <div v-else class="px-5 py-4 font-sans text-xs leading-relaxed text-gray-700 max-h-[600px] overflow-y-auto">
+                <!-- Rendered resume preview -->
+                <div class="mb-3">
+                  <h1 class="text-base font-bold text-gray-900">{{ form.headline || form.target_role || 'My Resume' }}</h1>
+                  <p v-if="form.target_role && form.headline" class="text-xs font-semibold text-blue-700 mt-0.5">{{ form.target_role }}</p>
+                  <div class="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 text-[10px] text-gray-500">
+                    <span v-if="form.location">{{ form.location }}</span>
+                    <span v-if="form.email">{{ form.email }}</span>
+                    <span v-if="form.phone">{{ form.phone }}</span>
+                    <span v-if="form.linkedin_url" class="text-blue-600">LinkedIn</span>
+                    <span v-if="form.github_url" class="text-gray-500">GitHub</span>
                   </div>
-                  <p v-if="exp.location" class="text-[10px] text-gray-400 font-sans">{{ exp.location }}</p>
-                  <ul v-if="exp.bullets.length > 0" class="mt-1 space-y-0.5">
-                    <li v-for="(b, bi) in exp.bullets" :key="bi" class="flex items-start gap-1.5 text-xs text-gray-700 font-sans">
-                      <span class="text-gray-400 flex-shrink-0 mt-0.5">·</span>
-                      <span>{{ b }}</span>
-                    </li>
-                  </ul>
                 </div>
-                <hr class="border-gray-200 mt-3" />
-              </div>
-
-              <!-- Education -->
-              <div v-if="form.education_items.length > 0" class="mb-4">
-                <h2 class="text-xs font-bold text-gray-900 uppercase tracking-wider font-sans mb-2">Education</h2>
-                <div v-for="(edu, i) in form.education_items" :key="i" class="mb-2">
-                  <p class="text-xs font-bold text-gray-900 font-sans">{{ edu.degree || '(Degree)' }}</p>
-                  <p class="text-[10px] text-gray-500 font-sans">{{ edu.institution }}<span v-if="edu.dates"> · {{ edu.dates }}</span></p>
+                <hr class="border-gray-200 my-2" />
+                <div v-if="form.professional_summary" class="mb-3">
+                  <h2 class="text-[10px] font-bold text-gray-900 uppercase tracking-wider mb-1">Summary</h2>
+                  <p class="text-[10px] text-gray-700 leading-relaxed">{{ form.professional_summary }}</p>
                 </div>
-                <hr class="border-gray-200 mt-3" />
-              </div>
-
-              <!-- Certs -->
-              <div v-if="form.certifications.length > 0" class="mb-4">
-                <h2 class="text-xs font-bold text-gray-900 uppercase tracking-wider font-sans mb-1.5">Certifications</h2>
-                <ul class="space-y-0.5">
-                  <li v-for="(c, i) in form.certifications" :key="i" class="flex items-start gap-1.5 text-xs text-gray-700 font-sans">
-                    <span class="text-gray-400">·</span><span>{{ c }}</span>
-                  </li>
-                </ul>
-              </div>
-
-              <!-- Languages -->
-              <div v-if="form.languages.length > 0" class="mb-4">
-                <h2 class="text-xs font-bold text-gray-900 uppercase tracking-wider font-sans mb-1.5">Languages</h2>
-                <p class="text-xs text-gray-700 font-sans">{{ form.languages.join(' · ') }}</p>
-              </div>
-
-              <!-- Achievements -->
-              <div v-if="form.achievements.length > 0" class="mb-2">
-                <h2 class="text-xs font-bold text-gray-900 uppercase tracking-wider font-sans mb-1.5">Key Achievements</h2>
-                <ul class="space-y-0.5">
-                  <li v-for="(a, i) in form.achievements" :key="i" class="flex items-start gap-1.5 text-xs text-gray-700 font-sans">
-                    <span class="text-gray-400">·</span><span>{{ a }}</span>
-                  </li>
-                </ul>
+                <div v-if="form.skills.length > 0" class="mb-3">
+                  <h2 class="text-[10px] font-bold text-gray-900 uppercase tracking-wider mb-1">Skills</h2>
+                  <p class="text-[10px] text-gray-700">{{ form.skills.join(' · ') }}</p>
+                </div>
+                <div v-if="form.experience_items.length > 0" class="mb-3">
+                  <h2 class="text-[10px] font-bold text-gray-900 uppercase tracking-wider mb-1.5">Experience</h2>
+                  <div v-for="(exp, i) in form.experience_items" :key="i" class="mb-2">
+                    <div class="flex items-baseline justify-between">
+                      <p class="text-[10px] font-bold text-gray-900">{{ exp.title || '(Role)' }}<span v-if="exp.company"> at {{ exp.company }}</span></p>
+                      <span class="text-[9px] text-gray-400 flex-shrink-0 ml-2">{{ exp.start_date }}{{ exp.currently_working ? ' - Present' : exp.end_date ? ` - ${exp.end_date}` : '' }}</span>
+                    </div>
+                    <ul v-if="exp.bullets.length > 0" class="mt-0.5 space-y-0.5">
+                      <li v-for="(b, bi) in exp.bullets" :key="bi" class="flex items-start gap-1 text-[10px] text-gray-700">
+                        <span class="text-gray-400 flex-shrink-0">·</span><span>{{ b }}</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                <div v-if="form.education_items.length > 0" class="mb-2">
+                  <h2 class="text-[10px] font-bold text-gray-900 uppercase tracking-wider mb-1">Education</h2>
+                  <div v-for="(edu, i) in form.education_items" :key="i">
+                    <p class="text-[10px] font-bold text-gray-900">{{ edu.degree }}</p>
+                    <p class="text-[9px] text-gray-500">{{ edu.institution }}<span v-if="edu.dates"> · {{ edu.dates }}</span></p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </AppCard>
 
           <!-- Privacy footer -->
           <div class="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 space-y-1.5">
@@ -1363,19 +1105,13 @@ function clearSelection() {
                 <svg class="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                 </svg>
-                Resume profile stored in <code class="bg-gray-100 px-1 rounded font-mono text-[10px]">data/resume_profile.json</code>
+                Profile in <code class="bg-gray-100 px-1 rounded font-mono text-[10px]">data/resume_profile.json</code>
               </div>
               <div class="flex items-center gap-2 text-xs text-gray-500">
                 <svg class="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                 </svg>
-                Draft saved to <code class="bg-gray-100 px-1 rounded font-mono text-[10px]">data/resume_preview.md</code>
-              </div>
-              <div class="flex items-center gap-2 text-xs text-gray-500">
-                <svg class="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-                Both files are in <code class="bg-gray-100 px-1 rounded font-mono text-[10px]">.gitignore</code> — never committed
+                Draft in <code class="bg-gray-100 px-1 rounded font-mono text-[10px]">data/resume_preview.md</code>
               </div>
               <div class="flex items-center gap-2 text-xs text-gray-400">
                 <svg class="h-3.5 w-3.5 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1385,6 +1121,7 @@ function clearSelection() {
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </template>

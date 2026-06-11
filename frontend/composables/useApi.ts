@@ -4,6 +4,7 @@ import type {
   ResumeInfo, ResumeProfile, ResumeProfileUpdate,
   CVImportPreview, CVImportApplyRequest,
   ApplicationPacket, ApplicationPacketUpdate,
+  ResumeQualityReport,
 } from '~/types'
 
 export const useApi = () => {
@@ -58,8 +59,12 @@ export const useApi = () => {
     // Resume Studio
     getResumeProfile: () => get<ResumeProfile>('/api/resume/profile'),
     updateResumeProfile: (updates: ResumeProfileUpdate) => put<ResumeProfile>('/api/resume/profile', updates),
-    generateResumeDraft: () => post<{ generated: boolean; preview: string }>('/api/resume/generate'),
+    generateResumeDraft: (tone?: string) =>
+      post<{ generated: boolean; preview: string; tone: string }>(
+        tone ? `/api/resume/generate?tone=${encodeURIComponent(tone)}` : '/api/resume/generate'
+      ),
     getResumePreview: () => get<{ preview: string; has_content: boolean }>('/api/resume/preview'),
+    getResumeQuality: () => get<ResumeQualityReport>('/api/resume/quality'),
     // CV Import
     extractCvText: () => post<{ extracted: boolean; text: string; reason?: string }>('/api/resume/extract-cv'),
     importCvText: (text: string) => post<CVImportPreview>('/api/resume/import-text', { text }),

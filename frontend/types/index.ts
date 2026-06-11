@@ -216,6 +216,24 @@ export interface ApplicationPacket {
 
 export type ApplicationPacketUpdate = Partial<Omit<ApplicationPacket, 'updated_at'>>
 
+// ── Resume Editor — Phase 6 ───────────────────────────────────────────────────
+
+export type ResumeTone = 'professional' | 'executive' | 'technical' | 'concise'
+
+export interface ResumeATSCheck {
+  label: string
+  passed: boolean
+}
+
+export interface ResumeQualityReport {
+  completeness_score: number
+  ats_score: number
+  ats_total: number
+  sections: Record<string, boolean>
+  missing_sections: string[]
+  ats_checks: ResumeATSCheck[]
+}
+
 export interface DailyBrief {
   date: string
   stats: Stats
