@@ -46,6 +46,7 @@ class ResumeProfile(BaseModel):
     certifications: List[str] = Field(default_factory=list)
     languages: List[str] = Field(default_factory=list)
     achievements: List[str] = Field(default_factory=list)
+    raw_cv_notes: str = ""
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -66,3 +67,4 @@ class ResumeProfileUpdate(BaseModel):
     certifications: Optional[List[str]] = None
     languages: Optional[List[str]] = None
     achievements: Optional[List[str]] = None
+    raw_cv_notes: Optional[str] = None

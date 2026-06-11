@@ -1,4 +1,10 @@
-import type { Stats, Job, Lead, Draft, DailyBrief, CandidateProfile, ProfileUpdate, ResumeInfo, ResumeProfile, ResumeProfileUpdate } from '~/types'
+import type {
+  Stats, Job, Lead, Draft, DailyBrief,
+  CandidateProfile, ProfileUpdate,
+  ResumeInfo, ResumeProfile, ResumeProfileUpdate,
+  CVImportPreview, CVImportApplyRequest,
+  ApplicationPacket, ApplicationPacketUpdate,
+} from '~/types'
 
 export const useApi = () => {
   const config = useRuntimeConfig()
@@ -54,5 +60,14 @@ export const useApi = () => {
     updateResumeProfile: (updates: ResumeProfileUpdate) => put<ResumeProfile>('/api/resume/profile', updates),
     generateResumeDraft: () => post<{ generated: boolean; preview: string }>('/api/resume/generate'),
     getResumePreview: () => get<{ preview: string; has_content: boolean }>('/api/resume/preview'),
+    // CV Import
+    extractCvText: () => post<{ extracted: boolean; text: string; reason?: string }>('/api/resume/extract-cv'),
+    importCvText: (text: string) => post<CVImportPreview>('/api/resume/import-text', { text }),
+    getImportPreview: () => get<CVImportPreview>('/api/resume/import-preview'),
+    applyImport: (opts: CVImportApplyRequest) => post<{ applied: boolean; fields_updated: string[] }>('/api/resume/apply-import', opts),
+    // Application Packet
+    getApplicationPacket: () => get<ApplicationPacket>('/api/application-packet'),
+    updateApplicationPacket: (updates: ApplicationPacketUpdate) => put<ApplicationPacket>('/api/application-packet', updates),
+    generateApplicationPacket: () => post<ApplicationPacket>('/api/application-packet/generate'),
   }
 }

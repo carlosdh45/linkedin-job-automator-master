@@ -14,6 +14,13 @@ exports/
 data/resume_profile.json
 data/resume_preview.md
 
+# ── CV Import data (never commit — contains user CV text) ─────────────────────
+data/resume_extracted_text.txt
+data/resume_import_preview.json
+
+# ── Application Packet data (never commit — local dev only) ───────────────────
+data/application_packet.json
+
 # ── SQLite ─────────────────────────────────────────────────────────────────────
 *.db
 *.db-wal

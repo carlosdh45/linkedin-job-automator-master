@@ -162,10 +162,59 @@ export interface ResumeProfile {
   certifications: string[]
   languages: string[]
   achievements: string[]
+  raw_cv_notes: string
   updated_at: string
 }
 
 export type ResumeProfileUpdate = Partial<Omit<ResumeProfile, 'updated_at'>>
+
+// ── CV Import ─────────────────────────────────────────────────────────────────
+
+export interface CVImportPreview {
+  raw_text: string
+  detected_email: string
+  detected_phone: string
+  detected_linkedin: string
+  detected_github: string
+  detected_portfolio: string
+  detected_skills: string[]
+  detected_experience_headings: string[]
+  detected_education_entries: string[]
+  detected_certifications: string[]
+  raw_notes: string
+  has_content: boolean
+}
+
+export interface CVImportApplyRequest {
+  apply_email: boolean
+  apply_phone: boolean
+  apply_linkedin: boolean
+  apply_github: boolean
+  apply_portfolio: boolean
+  apply_skills: boolean
+  apply_certifications: boolean
+  apply_raw_notes: boolean
+}
+
+// ── Application Packet ────────────────────────────────────────────────────────
+
+export interface ChecklistItem {
+  text: string
+  done: boolean
+}
+
+export interface ApplicationPacket {
+  target_job_title: string
+  target_company: string
+  resume_markdown: string
+  cover_letter_draft: string
+  talking_points: string[]
+  checklist: ChecklistItem[]
+  status: string
+  updated_at: string | null
+}
+
+export type ApplicationPacketUpdate = Partial<Omit<ApplicationPacket, 'updated_at'>>
 
 export interface DailyBrief {
   date: string

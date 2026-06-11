@@ -6,6 +6,8 @@ import type {
   ResumeEducationItem,
   ResumeProjectItem,
   ResumeInfo,
+  CVImportPreview,
+  CVImportApplyRequest,
 } from '~/types'
 
 const api = useApi()
@@ -27,6 +29,18 @@ const uploading = ref(false)
 const uploadResult = ref<'idle' | 'success' | 'error'>('idle')
 const uploadError = ref('')
 
+// ── CV Import state ────────────────────────────────────────────────────────────
+const importTab = ref<'upload' | 'paste'>('upload')
+const pasteText = ref('')
+const extracting = ref(false)
+const extractedText = ref('')
+const analyzing = ref(false)
+const importPreview = ref<CVImportPreview | null>(null)
+const importAnalyzeError = ref('')
+const applyingImport = ref(false)
+const applyResult = ref<'idle' | 'success' | 'error'>('idle')
+const applyFields = ref<string[]>([])
+
 // ── Form state ────────────────────────────────────────────────────────────────
 const form = reactive<Omit<ResumeProfile, 'updated_at'>>({
   headline: '',
@@ -45,6 +59,7 @@ const form = reactive<Omit<ResumeProfile, 'updated_at'>>({
   certifications: [],
   languages: [],
   achievements: [],
+  raw_cv_notes: '',
 })
 
 const skillsInput = ref('')
@@ -127,6 +142,7 @@ async function loadAll() {
       form.certifications = [...p.certifications]
       form.languages = [...p.languages]
       form.achievements = [...p.achievements]
+      form.raw_cv_notes = p.raw_cv_notes || ''
       certsText.value = p.certifications.join('\n')
       langsText.value = p.languages.join('\n')
       achievementsText.value = p.achievements.join('\n')
@@ -144,6 +160,14 @@ async function loadAll() {
     loadError.value = true
   } finally {
     loading.value = false
+  }
+
+  // Load import preview silently (non-blocking)
+  try {
+    const p = await api.getImportPreview()
+    if (p.has_content) importPreview.value = p
+  } catch {
+    // non-critical
   }
 }
 
@@ -253,6 +277,7 @@ async function save() {
       certifications: form.certifications,
       languages: form.languages,
       achievements: form.achievements,
+      raw_cv_notes: form.raw_cv_notes,
     }
     await api.updateResumeProfile(updates)
     saveResult.value = 'success'
@@ -280,7 +305,7 @@ async function regenerate() {
   }
 }
 
-// ── Copy ──────────────────────────────────────────────────────────────────────
+// ── Copy / Print ──────────────────────────────────────────────────────────────
 async function copyDraft() {
   if (!previewContent.value) return
   try {
@@ -289,6 +314,79 @@ async function copyDraft() {
     setTimeout(() => { copied.value = false }, 2500)
   } catch {
     // clipboard not available in some dev environments
+  }
+}
+
+const copiedPlain = ref(false)
+async function copyPlainText() {
+  const plain = previewContent.value.replace(/#{1,6} /g, '').replace(/[*_`]/g, '').replace(/^- /gm, '• ')
+  try {
+    await navigator.clipboard.writeText(plain)
+    copiedPlain.value = true
+    setTimeout(() => { copiedPlain.value = false }, 2500)
+  } catch {}
+}
+
+function printResume() {
+  window.print()
+}
+
+// ── CV Import Assistant ────────────────────────────────────────────────────────
+async function extractFromUpload() {
+  extracting.value = true
+  importAnalyzeError.value = ''
+  try {
+    const res = await api.extractCvText()
+    if (res.extracted && res.text) {
+      extractedText.value = res.text
+      importTab.value = 'upload'
+    } else {
+      importAnalyzeError.value = res.reason || 'Could not extract text — try pasting it manually.'
+    }
+  } catch {
+    importAnalyzeError.value = 'Extraction failed — is the backend running?'
+  } finally {
+    extracting.value = false
+  }
+}
+
+async function analyzeLocally() {
+  const text = importTab.value === 'paste' ? pasteText.value : extractedText.value
+  if (!text.trim()) {
+    importAnalyzeError.value = 'No text to analyse. Extract from upload or paste CV text first.'
+    return
+  }
+  analyzing.value = true
+  importAnalyzeError.value = ''
+  try {
+    importPreview.value = await api.importCvText(text)
+  } catch {
+    importAnalyzeError.value = 'Analysis failed — is the backend running?'
+  } finally {
+    analyzing.value = false
+  }
+}
+
+async function applyImport() {
+  if (!importPreview.value?.has_content) return
+  applyingImport.value = true
+  applyResult.value = 'idle'
+  try {
+    const opts: CVImportApplyRequest = {
+      apply_email: true, apply_phone: true,
+      apply_linkedin: true, apply_github: true, apply_portfolio: true,
+      apply_skills: true, apply_certifications: true, apply_raw_notes: true,
+    }
+    const res = await api.applyImport(opts)
+    if (res.applied) {
+      applyResult.value = 'success'
+      applyFields.value = res.fields_updated
+      await loadAll()
+    }
+  } catch {
+    applyResult.value = 'error'
+  } finally {
+    applyingImport.value = false
   }
 }
 
@@ -515,6 +613,180 @@ function clearSelection() {
                   {{ uploading ? 'Uploading…' : 'Upload CV' }}
                 </button>
               </div>
+            </div>
+          </AppCard>
+
+          <!-- ── CV Import Assistant ─────────────────────────────────────── -->
+          <AppCard>
+            <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-900">CV Import Assistant</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Extract text locally → review detected fields → apply to editor</p>
+              </div>
+              <span class="rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Local only</span>
+            </div>
+            <div class="px-5 py-4 space-y-4">
+
+              <!-- Tab switcher -->
+              <div class="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+                <button
+                  class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
+                  :class="importTab === 'upload' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                  @click="importTab = 'upload'"
+                >From Upload</button>
+                <button
+                  class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
+                  :class="importTab === 'paste' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                  @click="importTab = 'paste'"
+                >Paste CV Text</button>
+              </div>
+
+              <!-- Upload tab -->
+              <div v-if="importTab === 'upload'" class="space-y-3">
+                <div v-if="!resumeInfo" class="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5 text-xs text-amber-700">
+                  Upload a CV file above first, then click "Extract Text".
+                </div>
+                <div v-else class="flex items-center gap-3 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2.5">
+                  <svg class="h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                  </svg>
+                  <span class="text-xs text-blue-800 font-medium truncate">{{ resumeInfo.original_filename }}</span>
+                </div>
+                <button
+                  :disabled="!resumeInfo || extracting"
+                  class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition"
+                  @click="extractFromUpload"
+                >
+                  <svg v-if="extracting" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                  <svg v-else class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 7.5h-.75A2.25 2.25 0 004.5 9.75v7.5a2.25 2.25 0 002.25 2.25h7.5a2.25 2.25 0 002.25-2.25v-7.5a2.25 2.25 0 00-2.25-2.25h-.75m0-3l-3-3m0 0l-3 3m3-3v11.25m6-2.25h.75a2.25 2.25 0 012.25 2.25v7.5a2.25 2.25 0 01-2.25 2.25h-7.5a2.25 2.25 0 01-2.25-2.25v-.75" />
+                  </svg>
+                  {{ extracting ? 'Extracting…' : 'Extract Text from Upload' }}
+                </button>
+                <div v-if="extractedText" class="space-y-1">
+                  <p class="text-xs font-medium text-gray-600">Extracted text preview</p>
+                  <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 max-h-28 overflow-y-auto">
+                    <p class="text-xs text-gray-600 whitespace-pre-wrap font-mono leading-relaxed">{{ extractedText.slice(0, 600) }}{{ extractedText.length > 600 ? '…' : '' }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Paste tab -->
+              <div v-if="importTab === 'paste'" class="space-y-2">
+                <label class="block text-xs font-medium text-gray-600">Paste CV text here</label>
+                <textarea
+                  v-model="pasteText"
+                  rows="7"
+                  placeholder="Paste the full text of your CV or resume here. You can copy it from a PDF viewer, Word, or any text editor…"
+                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition font-mono resize-none"
+                />
+                <p class="text-xs text-gray-400">Nothing is sent externally. All analysis runs locally.</p>
+              </div>
+
+              <!-- Analyse button -->
+              <div class="flex items-center gap-3">
+                <button
+                  :disabled="analyzing || (importTab === 'upload' ? !extractedText : !pasteText.trim())"
+                  class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition"
+                  @click="analyzeLocally"
+                >
+                  <svg v-if="analyzing" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                  <svg v-else class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                  </svg>
+                  {{ analyzing ? 'Analysing…' : 'Analyse Locally' }}
+                </button>
+                <span v-if="importAnalyzeError" class="text-xs text-red-600">{{ importAnalyzeError }}</span>
+              </div>
+
+              <!-- Import Preview -->
+              <div v-if="importPreview?.has_content" class="rounded-xl border border-blue-100 bg-blue-50 p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <p class="text-xs font-semibold text-blue-900">Import Preview — Review before applying</p>
+                  <span class="text-[10px] text-blue-600 bg-blue-100 rounded-full px-2 py-0.5">Local heuristics only</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                  <div v-if="importPreview.detected_email">
+                    <span class="text-blue-600 font-medium">Email: </span>
+                    <span class="text-blue-900">{{ importPreview.detected_email }}</span>
+                  </div>
+                  <div v-if="importPreview.detected_phone">
+                    <span class="text-blue-600 font-medium">Phone: </span>
+                    <span class="text-blue-900">{{ importPreview.detected_phone }}</span>
+                  </div>
+                  <div v-if="importPreview.detected_linkedin">
+                    <span class="text-blue-600 font-medium">LinkedIn: </span>
+                    <span class="text-blue-900 truncate">{{ importPreview.detected_linkedin }}</span>
+                  </div>
+                  <div v-if="importPreview.detected_github">
+                    <span class="text-blue-600 font-medium">GitHub: </span>
+                    <span class="text-blue-900 truncate">{{ importPreview.detected_github }}</span>
+                  </div>
+                </div>
+
+                <div v-if="importPreview.detected_skills.length > 0">
+                  <p class="text-xs font-medium text-blue-700 mb-1">Detected skills ({{ importPreview.detected_skills.length }})</p>
+                  <div class="flex flex-wrap gap-1">
+                    <span
+                      v-for="s in importPreview.detected_skills.slice(0, 20)"
+                      :key="s"
+                      class="rounded-full bg-white border border-blue-200 px-2 py-0.5 text-[10px] text-blue-800"
+                    >{{ s }}</span>
+                    <span v-if="importPreview.detected_skills.length > 20" class="text-[10px] text-blue-500">+{{ importPreview.detected_skills.length - 20 }} more</span>
+                  </div>
+                </div>
+
+                <div v-if="importPreview.detected_experience_headings.length > 0">
+                  <p class="text-xs font-medium text-blue-700 mb-1">Experience headings detected</p>
+                  <ul class="space-y-0.5">
+                    <li v-for="h in importPreview.detected_experience_headings.slice(0, 5)" :key="h" class="text-xs text-blue-800">· {{ h }}</li>
+                    <li v-if="importPreview.detected_experience_headings.length > 5" class="text-xs text-blue-500">+{{ importPreview.detected_experience_headings.length - 5 }} more</li>
+                  </ul>
+                </div>
+
+                <div v-if="importPreview.detected_education_entries.length > 0">
+                  <p class="text-xs font-medium text-blue-700 mb-1">Education detected</p>
+                  <ul class="space-y-0.5">
+                    <li v-for="e in importPreview.detected_education_entries.slice(0, 4)" :key="e" class="text-xs text-blue-800">· {{ e }}</li>
+                  </ul>
+                </div>
+
+                <div v-if="importPreview.detected_certifications.length > 0">
+                  <p class="text-xs font-medium text-blue-700 mb-1">Certifications detected</p>
+                  <ul class="space-y-0.5">
+                    <li v-for="c in importPreview.detected_certifications.slice(0, 5)" :key="c" class="text-xs text-blue-800">· {{ c }}</li>
+                  </ul>
+                </div>
+
+                <!-- Apply result -->
+                <div v-if="applyResult === 'success'" class="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">
+                  <svg class="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span class="text-xs text-emerald-700">Applied to Resume Studio: {{ applyFields.join(', ') || 'no new fields' }}</span>
+                </div>
+                <div v-if="applyResult === 'error'" class="text-xs text-red-600">Apply failed — is the backend running?</div>
+
+                <div class="flex items-center gap-2 pt-1">
+                  <button
+                    :disabled="applyingImport"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+                    @click="applyImport"
+                  >
+                    <svg v-if="applyingImport" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                    {{ applyingImport ? 'Applying…' : 'Apply Import to Resume Studio' }}
+                  </button>
+                  <span class="text-[10px] text-gray-400">Only updates empty fields (merges skills & certifications)</span>
+                </div>
+              </div>
+
             </div>
           </AppCard>
 
@@ -868,6 +1140,22 @@ function clearSelection() {
             </div>
           </AppCard>
 
+          <!-- Raw CV Notes -->
+          <AppCard>
+            <div class="px-5 py-3.5 border-b border-gray-100">
+              <h3 class="text-sm font-semibold text-gray-900">Raw CV Notes</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Unstructured text from your CV import — for reference only, not included in the resume draft</p>
+            </div>
+            <div class="px-5 py-4">
+              <textarea
+                v-model="form.raw_cv_notes"
+                rows="5"
+                placeholder="Paste or edit any raw notes, unformatted CV text, or notes to yourself here…"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition resize-none font-mono text-xs"
+              />
+            </div>
+          </AppCard>
+
           <!-- Save row -->
           <div class="flex items-center justify-between pb-4">
             <transition name="fade">
@@ -926,19 +1214,32 @@ function clearSelection() {
               <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
               </svg>
-              {{ copied ? 'Copied!' : 'Copy Draft' }}
+              {{ copied ? 'Copied!' : 'Copy Markdown' }}
             </button>
 
             <button
-              disabled
-              class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-400 opacity-50 cursor-not-allowed"
-              title="Coming in a future phase"
+              :disabled="!previewContent"
+              class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition"
+              @click="copyPlainText"
+            >
+              <svg v-if="copiedPlain" class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              {{ copiedPlain ? 'Copied!' : 'Copy Plain Text' }}
+            </button>
+
+            <button
+              :disabled="!previewContent"
+              class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition"
+              @click="printResume"
             >
               <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
               </svg>
-              Export PDF
-              <span class="ml-1 text-[10px] bg-gray-100 text-gray-400 rounded px-1.5 py-0.5 font-medium">Soon</span>
+              Print
             </button>
           </div>
 
