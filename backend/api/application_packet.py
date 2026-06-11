@@ -56,6 +56,7 @@ async def generate_application_packet(
     existing = packet_store.get_packet(packet_path)
     job_title = existing.target_job_title or profile.target_role or ""
     company = existing.target_company or ""
+    job_description = existing.job_description or ""
 
-    packet = packet_generator.generate_packet(profile, job_title, company, resume_md)
+    packet = packet_generator.generate_packet(profile, job_title, company, resume_md, job_description)
     return packet_store.save_packet(packet_path, packet)

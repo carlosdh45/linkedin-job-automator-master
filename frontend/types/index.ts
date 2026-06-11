@@ -206,11 +206,16 @@ export interface ChecklistItem {
 export interface ApplicationPacket {
   target_job_title: string
   target_company: string
+  job_description: string
   resume_markdown: string
   cover_letter_draft: string
+  tailored_summary: string
+  skills_emphasis: string[]
+  fit_summary: string
   talking_points: string[]
   checklist: ChecklistItem[]
   status: string
+  notes: string
   updated_at: string | null
 }
 

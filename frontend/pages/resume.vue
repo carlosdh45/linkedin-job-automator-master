@@ -26,6 +26,10 @@ const copiedPlain = ref(false)
 // ── Tone ──────────────────────────────────────────────────────────────────────
 const tone = ref<ResumeTone>('professional')
 
+// ── Dirty tracking — true when form changed since last successful regenerate ──
+const formDirty = ref(false)
+const _formLoaded = ref(false)
+
 // ── CV upload state ───────────────────────────────────────────────────────────
 const resumeInfo     = ref<ResumeInfo | null>(null)
 const selectedFile   = ref<File | null>(null)
@@ -122,6 +126,7 @@ async function loadAll() {
     loadError.value = true
   } finally {
     loading.value = false
+    _formLoaded.value = true
   }
 
   try {
@@ -133,6 +138,10 @@ async function loadAll() {
 }
 
 onMounted(loadAll)
+
+watch(form, () => {
+  if (_formLoaded.value) formDirty.value = true
+}, { deep: true })
 
 // ── Skills ────────────────────────────────────────────────────────────────────
 function addSkillsFromInput() {
@@ -223,6 +232,7 @@ async function regenerate() {
     if (result.generated) {
       previewContent.value = result.preview
       showPreview.value    = true
+      formDirty.value      = false
     }
   } catch {
     // save already sets saveResult
@@ -254,6 +264,32 @@ async function copyPlainText() {
 }
 
 function printResume() { window.print() }
+
+function downloadMarkdown() {
+  if (!previewContent.value) return
+  const blob = new Blob([previewContent.value], { type: 'text/markdown' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = 'resume.md'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadPlainText() {
+  if (!previewContent.value) return
+  const plain = previewContent.value
+    .replace(/#{1,6} /g, '')
+    .replace(/[*_`]/g, '')
+    .replace(/^- /gm, '• ')
+  const blob = new Blob([plain], { type: 'text/plain' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = 'resume.txt'
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 // ── CV Import Assistant ────────────────────────────────────────────────────────
 async function extractFromUpload() {
@@ -416,7 +452,7 @@ function clearSelection() {
         </div>
       </div>
 
-      <!-- Action bar (Save, Regenerate, Copy, Print, Tone) -->
+      <!-- Action bar (Save & Regenerate, Copy, Download, Print, Tone) -->
       <ResumeActionBar
         v-model:tone="tone"
         :saving="saving"
@@ -425,10 +461,13 @@ function clearSelection() {
         :copied="copied"
         :copied-plain="copiedPlain"
         :has-preview="Boolean(previewContent)"
+        :has-changes="formDirty"
         @save="save"
         @regenerate="regenerate"
         @copy-markdown="copyDraft"
         @copy-plain="copyPlainText"
+        @download-markdown="downloadMarkdown"
+        @download-plain="downloadPlainText"
         @print="printResume"
       />
 
