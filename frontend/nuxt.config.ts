@@ -1,6 +1,6 @@
 export default defineNuxtConfig({
   devtools: { enabled: false },
-  modules: ['@nuxtjs/tailwindcss'],
+  modules: [['@nuxtjs/tailwindcss', { cssPath: '~/assets/css/main.css' }]],
   runtimeConfig: {
     public: {
       apiBase: 'http://localhost:8000',

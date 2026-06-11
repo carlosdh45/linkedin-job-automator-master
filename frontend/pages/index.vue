@@ -1,54 +1,83 @@
+<script setup lang="ts">
+import { statJobTotal, statJobScored, statLeadTotal, statLeadScored } from '~/types'
+
+const api = useApi()
+const showSeedConfirm = ref(false)
+
+const { data: brief, pending, error, refresh } = await useAsyncData('dashboard', () => api.getDailyBrief())
+
+const today = computed(() =>
+  brief.value?.date
+    ? new Date(brief.value.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+    : new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+)
+
+const stats = computed(() => brief.value?.stats ?? {})
+const jobTotal = computed(() => statJobTotal(stats.value))
+const jobScored = computed(() => statJobScored(stats.value))
+const leadTotal = computed(() => statLeadTotal(stats.value))
+const leadScored = computed(() => statLeadScored(stats.value))
+const outreachGenerated = computed(() => stats.value.outreach_generated ?? 0)
+const reviewPending = computed(() => brief.value?.pending_drafts.total ?? 0)
+const approvable = computed(() => brief.value?.pending_drafts.approvable.length ?? 0)
+
+async function seedDemo() {
+  try {
+    await api.seedDemo()
+    await refresh()
+  } catch {
+    // non-critical
+  }
+}
+</script>
+
 <template>
-  <div class="flex-1 overflow-y-auto">
-    <!-- Page header -->
-    <div class="sticky top-0 z-10 bg-slate-950/80 backdrop-blur border-b border-slate-800 px-8 py-4 flex items-center justify-between">
-      <div>
-        <h1 class="text-xl font-bold text-slate-100">Dashboard</h1>
-        <p class="text-xs text-slate-500 mt-0.5">{{ today }}</p>
-      </div>
-      <div class="flex items-center gap-3">
+  <div class="flex-1 flex flex-col overflow-y-auto">
+    <PageHeader title="Dashboard" :subtitle="today">
+      <template #actions>
         <button
-          class="px-3 py-1.5 text-xs font-medium text-slate-400 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
-          @click="() => refresh()"
-        >
-          Refresh
-        </button>
-        <button
-          class="px-3 py-1.5 text-xs font-medium text-blue-400 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-800/50 rounded-lg transition-colors"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           @click="showSeedConfirm = true"
         >
           Load Demo Data
         </button>
-      </div>
-    </div>
+        <button
+          class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          :disabled="pending"
+          @click="() => refresh()"
+        >
+          <svg class="h-3.5 w-3.5" :class="{ 'animate-spin': pending }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+          </svg>
+          Refresh
+        </button>
+      </template>
+    </PageHeader>
 
-    <div class="px-8 py-6 space-y-6 max-w-7xl mx-auto">
+    <div class="flex-1 p-6 space-y-6 max-w-7xl w-full mx-auto">
       <!-- Safety banner -->
-      <div class="flex items-center gap-3 px-4 py-3 bg-emerald-950/40 border border-emerald-900/50 rounded-xl">
-        <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
+      <div class="flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
+        <svg class="h-4 w-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
         </svg>
-        <p class="text-sm font-medium text-emerald-400">
-          DobryBot never sends or applies automatically. Every action requires human approval.
-        </p>
+        <span class="text-sm text-emerald-700 font-medium">All actions require explicit human approval — DobryBot never sends or applies automatically.</span>
       </div>
 
-      <!-- Loading / error states -->
       <LoadingSpinner v-if="pending" label="Loading dashboard…" />
 
       <template v-else-if="error">
-        <div class="rounded-xl border border-red-900/50 bg-red-950/30 p-6 text-center">
-          <p class="text-red-400 font-medium">Could not reach the backend.</p>
-          <p class="text-sm text-slate-500 mt-1">Make sure <code class="text-slate-400">uvicorn backend.main:app --reload --port 8000</code> is running.</p>
-          <button class="mt-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-sm text-slate-200 rounded-lg transition-colors" @click="() => refresh()">
-            Retry
-          </button>
-        </div>
+        <AppCard>
+          <ErrorState
+            message="Could not reach the backend. Make sure uvicorn is running on port 8000."
+            :show-retry="true"
+            @retry="() => refresh()"
+          />
+        </AppCard>
       </template>
 
       <template v-else-if="brief">
-        <!-- Stats cards -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Stats -->
+        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             title="Jobs Tracked"
             :value="jobTotal"
@@ -66,117 +95,129 @@
           <StatCard
             title="Outreach Drafts"
             :value="outreachGenerated"
-            :sub="`${outreachSent} sent by you`"
+            :sub="`${reviewPending} pending review`"
             variant="green"
             icon="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
           />
           <StatCard
             title="Review Queue"
             :value="reviewPending"
-            :sub="reviewPending === 1 ? 'draft awaiting review' : 'drafts awaiting review'"
+            :sub="reviewPending === 1 ? '1 draft awaiting review' : `${approvable} approvable`"
             variant="amber"
             icon="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
           />
         </div>
 
-        <!-- Recommended actions + top opportunities -->
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <!-- Top Jobs -->
-          <div class="xl:col-span-1 bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
-              <h2 class="text-sm font-semibold text-slate-200">Top Jobs</h2>
-              <NuxtLink to="/jobs" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">View all →</NuxtLink>
-            </div>
-            <div v-if="brief.top_jobs.length === 0" class="px-5 py-8 text-center text-sm text-slate-500">
-              No high-priority jobs found.
-            </div>
-            <ul v-else class="divide-y divide-slate-700/50">
-              <li
-                v-for="job in brief.top_jobs.slice(0, 6)"
-                :key="job.id"
-                class="px-5 py-3 flex items-center gap-3 hover:bg-slate-700/30 transition-colors"
-              >
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-slate-200 truncate">{{ job.title }}</p>
-                  <p class="text-xs text-slate-500 truncate">{{ job.company }}</p>
-                </div>
-                <div class="flex-shrink-0 flex items-center gap-2">
-                  <span class="text-xs font-semibold text-blue-400 tabular-nums">{{ job.job_score }}</span>
-                  <StatusBadge :status="job.score_label || job.status" />
-                </div>
-              </li>
-            </ul>
+        <!-- Content grid -->
+        <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <!-- Top Jobs + Leads (2/3 width) -->
+          <div class="xl:col-span-2 space-y-6">
+            <!-- Top Jobs -->
+            <AppCard>
+              <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-900">Top Jobs</h2>
+                <NuxtLink to="/jobs" class="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">View all →</NuxtLink>
+              </div>
+              <div v-if="!brief.top_jobs.length" class="py-10 text-center text-sm text-gray-400">
+                No high-priority jobs yet.
+              </div>
+              <table v-else class="app-table">
+                <thead>
+                  <tr>
+                    <th>Role / Company</th>
+                    <th class="hidden sm:table-cell">Location</th>
+                    <th class="text-right">Score</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="job in brief.top_jobs.slice(0, 6)" :key="job.id">
+                    <td>
+                      <div class="font-medium text-gray-900 truncate max-w-xs">{{ job.title }}</div>
+                      <div class="text-xs text-gray-400 truncate max-w-xs">{{ job.company }}</div>
+                    </td>
+                    <td class="hidden sm:table-cell text-gray-500">{{ job.location || '—' }}</td>
+                    <td class="text-right font-semibold tabular-nums text-blue-600">{{ job.job_score }}</td>
+                    <td><StatusBadge :status="job.score_label || job.status" /></td>
+                  </tr>
+                </tbody>
+              </table>
+            </AppCard>
+
+            <!-- Top Leads -->
+            <AppCard>
+              <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-900">Top Leads</h2>
+                <NuxtLink to="/leads" class="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">View all →</NuxtLink>
+              </div>
+              <div v-if="!brief.top_leads.length" class="py-10 text-center text-sm text-gray-400">
+                No high-priority leads yet.
+              </div>
+              <table v-else class="app-table">
+                <thead>
+                  <tr>
+                    <th>Company</th>
+                    <th class="hidden sm:table-cell">Industry</th>
+                    <th class="text-right">Score</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="lead in brief.top_leads.slice(0, 6)" :key="lead.id">
+                    <td>
+                      <div class="font-medium text-gray-900 truncate max-w-xs">{{ lead.company }}</div>
+                      <div class="text-xs text-gray-400 truncate max-w-xs">{{ lead.domain }}</div>
+                    </td>
+                    <td class="hidden sm:table-cell text-gray-500">{{ lead.industry || '—' }}</td>
+                    <td class="text-right font-semibold tabular-nums text-violet-600">{{ lead.lead_score }}</td>
+                    <td><StatusBadge :status="lead.score_label || lead.status" /></td>
+                  </tr>
+                </tbody>
+              </table>
+            </AppCard>
           </div>
 
-          <!-- Top Leads -->
-          <div class="xl:col-span-1 bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
-              <h2 class="text-sm font-semibold text-slate-200">Top Leads</h2>
-              <NuxtLink to="/leads" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">View all →</NuxtLink>
-            </div>
-            <div v-if="brief.top_leads.length === 0" class="px-5 py-8 text-center text-sm text-slate-500">
-              No high-priority leads found.
-            </div>
-            <ul v-else class="divide-y divide-slate-700/50">
-              <li
-                v-for="lead in brief.top_leads.slice(0, 6)"
-                :key="lead.id"
-                class="px-5 py-3 flex items-center gap-3 hover:bg-slate-700/30 transition-colors"
-              >
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-slate-200 truncate">{{ lead.company }}</p>
-                  <p class="text-xs text-slate-500 truncate">{{ lead.industry || lead.domain }}</p>
-                </div>
-                <div class="flex-shrink-0 flex items-center gap-2">
-                  <span class="text-xs font-semibold text-violet-400 tabular-nums">{{ lead.lead_score }}</span>
-                  <StatusBadge :status="lead.score_label || lead.status" />
-                </div>
-              </li>
-            </ul>
-          </div>
+          <!-- Sidebar: Actions + Queue summary (1/3 width) -->
+          <div class="space-y-6">
+            <!-- Recommended Actions -->
+            <AppCard>
+              <div class="px-5 py-3.5 border-b border-gray-100">
+                <h2 class="text-sm font-semibold text-gray-900">Recommended Actions</h2>
+              </div>
+              <div class="px-5 py-4">
+                <p v-if="!brief.recommended_actions.length" class="text-sm text-gray-400">No actions suggested.</p>
+                <ol v-else class="space-y-3">
+                  <li v-for="(action, i) in brief.recommended_actions" :key="i" class="flex items-start gap-3">
+                    <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-blue-600 mt-0.5">
+                      {{ i + 1 }}
+                    </span>
+                    <span class="text-sm text-gray-700 leading-snug">{{ action }}</span>
+                  </li>
+                </ol>
+              </div>
+            </AppCard>
 
-          <!-- Recommended actions + review queue summary -->
-          <div class="xl:col-span-1 space-y-4">
-            <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-              <div class="px-5 py-4 border-b border-slate-700">
-                <h2 class="text-sm font-semibold text-slate-200">Recommended Actions</h2>
+            <!-- Review Queue summary -->
+            <AppCard v-if="brief.pending_drafts.total > 0">
+              <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-900">Review Queue</h2>
+                <NuxtLink to="/review-queue" class="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">Open →</NuxtLink>
               </div>
-              <ul class="px-5 py-3 space-y-2">
-                <li
-                  v-for="(action, i) in brief.recommended_actions"
-                  :key="i"
-                  class="flex items-start gap-2.5 text-sm text-slate-300"
-                >
-                  <span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-blue-900/40 text-blue-400 flex items-center justify-center text-xs font-bold">{{ i + 1 }}</span>
-                  <span class="leading-relaxed">{{ action }}</span>
-                </li>
-              </ul>
-            </div>
-
-            <!-- Review queue summary -->
-            <div
-              v-if="brief.pending_drafts.total > 0"
-              class="bg-slate-800 border border-amber-900/40 rounded-xl overflow-hidden"
-            >
-              <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-slate-200">Review Queue</h2>
-                <NuxtLink to="/review-queue" class="text-xs text-amber-400 hover:text-amber-300 transition-colors">Open →</NuxtLink>
-              </div>
-              <div class="px-5 py-4 space-y-2">
-                <div class="flex justify-between text-sm">
-                  <span class="text-slate-400">Total pending</span>
-                  <span class="font-semibold text-slate-200">{{ brief.pending_drafts.total }}</span>
+              <div class="px-5 py-4 space-y-2.5">
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-gray-600">Approvable</span>
+                  <span class="font-semibold text-emerald-600">{{ brief.pending_drafts.approvable.length }}</span>
                 </div>
-                <div class="flex justify-between text-sm">
-                  <span class="text-emerald-400">Approvable</span>
-                  <span class="font-semibold text-emerald-300">{{ brief.pending_drafts.approvable.length }}</span>
+                <div v-if="brief.pending_drafts.blocked.length > 0" class="flex items-center justify-between text-sm">
+                  <span class="text-gray-600">Quality blocked</span>
+                  <span class="font-semibold text-red-500">{{ brief.pending_drafts.blocked.length }}</span>
                 </div>
-                <div v-if="brief.pending_drafts.blocked.length > 0" class="flex justify-between text-sm">
-                  <span class="text-red-400">Quality blocked</span>
-                  <span class="font-semibold text-red-300">{{ brief.pending_drafts.blocked.length }}</span>
+                <div class="flex items-center justify-between text-sm border-t border-gray-100 pt-2.5">
+                  <span class="text-gray-500">Total</span>
+                  <span class="font-semibold text-gray-900">{{ brief.pending_drafts.total }}</span>
                 </div>
               </div>
-            </div>
+            </AppCard>
           </div>
         </div>
       </template>
@@ -193,32 +234,3 @@
     />
   </div>
 </template>
-
-<script setup lang="ts">
-import { statJobTotal, statJobScored, statLeadTotal, statLeadScored } from '~/types'
-
-const api = useApi()
-const showSeedConfirm = ref(false)
-
-const { data: brief, pending, error, refresh } = await useAsyncData('dashboard', () => api.getDailyBrief())
-
-const today = computed(() => brief.value?.date ?? new Date().toDateString())
-
-const stats = computed(() => brief.value?.stats ?? {})
-const jobTotal = computed(() => statJobTotal(stats.value))
-const jobScored = computed(() => statJobScored(stats.value))
-const leadTotal = computed(() => statLeadTotal(stats.value))
-const leadScored = computed(() => statLeadScored(stats.value))
-const outreachGenerated = computed(() => stats.value.outreach_generated ?? 0)
-const outreachSent = computed(() => stats.value.outreach_sent ?? 0)
-const reviewPending = computed(() => stats.value.outreach_pending_review ?? 0)
-
-async function seedDemo() {
-  try {
-    await api.seedDemo()
-    await refresh()
-  } catch {
-    // non-critical
-  }
-}
-</script>

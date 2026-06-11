@@ -1,96 +1,7 @@
-<template>
-  <div class="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
-    <!-- Sidebar -->
-    <aside class="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
-      <!-- Brand -->
-      <div class="px-5 py-4 border-b border-slate-800">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg flex-shrink-0">
-            <span class="text-white font-black text-base select-none">D</span>
-          </div>
-          <div class="min-w-0">
-            <div class="text-sm font-bold text-slate-100 leading-none truncate">DobryBot</div>
-            <div class="text-xs text-slate-500 mt-0.5">CorosDev Internal</div>
-          </div>
-        </div>
-        <!-- Backend health -->
-        <div class="mt-3 flex items-center gap-2">
-          <div
-            :class="{
-              'bg-emerald-400': health === 'ok',
-              'bg-red-400': health === 'error',
-              'bg-amber-400 animate-pulse': health === 'checking',
-            }"
-            class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-          />
-          <span class="text-xs text-slate-500 truncate">
-            <template v-if="health === 'ok'">Backend connected</template>
-            <template v-else-if="health === 'error'">Backend offline</template>
-            <template v-else>Connecting…</template>
-          </span>
-        </div>
-      </div>
-
-      <!-- Safety notice -->
-      <div class="mx-3 mt-3 px-3 py-2.5 bg-emerald-950/60 border border-emerald-900/50 rounded-lg">
-        <div class="flex items-start gap-2">
-          <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
-          </svg>
-          <span class="text-xs text-emerald-400 leading-relaxed">Never sends or applies automatically</span>
-        </div>
-      </div>
-
-      <!-- Navigation -->
-      <nav class="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-        <NuxtLink
-          v-for="item in navItems"
-          :key="item.to"
-          :to="item.to"
-          :class="[
-            'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors group',
-            $route.path === item.to
-              ? 'bg-blue-600/20 text-blue-400 font-medium'
-              : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
-          ]"
-        >
-          <svg
-            class="w-4.5 h-4.5 flex-shrink-0 w-5 h-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
-          </svg>
-          <span class="flex-1 truncate">{{ item.label }}</span>
-          <span
-            v-if="item.badge && item.badge > 0"
-            class="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-xs font-bold bg-blue-600 text-white"
-          >
-            {{ item.badge }}
-          </span>
-        </NuxtLink>
-      </nav>
-
-      <!-- Footer safety copy -->
-      <div class="px-4 py-3 border-t border-slate-800">
-        <p class="text-xs text-slate-600 text-center leading-relaxed">
-          DobryBot never sends or applies automatically.
-        </p>
-      </div>
-    </aside>
-
-    <!-- Main content -->
-    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-      <slot />
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 const api = useApi()
 const reviewCount = useReviewCount()
+const route = useRoute()
 
 const health = ref<'checking' | 'ok' | 'error'>('checking')
 
@@ -133,6 +44,11 @@ const navItems = computed(() => [
   },
 ])
 
+function isActive(to: string) {
+  if (to === '/') return route.path === '/'
+  return route.path.startsWith(to)
+}
+
 onMounted(async () => {
   try {
     const h = await api.getHealth()
@@ -148,3 +64,84 @@ onMounted(async () => {
   }
 })
 </script>
+
+<template>
+  <div class="flex h-screen overflow-hidden bg-gray-50">
+    <!-- Sidebar -->
+    <aside class="w-60 flex-shrink-0 flex flex-col bg-white border-r border-gray-200">
+      <!-- Brand -->
+      <div class="flex items-center gap-3 px-4 h-14 border-b border-gray-100">
+        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-xs flex-shrink-0 shadow-sm select-none">
+          D
+        </div>
+        <div class="min-w-0">
+          <div class="text-sm font-semibold text-gray-900 leading-none truncate">DobryBot</div>
+          <div class="text-xs text-gray-400 mt-0.5 truncate">CorosDev Internal</div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 overflow-y-auto px-2 py-3">
+        <div class="space-y-0.5">
+          <NuxtLink
+            v-for="item in navItems"
+            :key="item.to"
+            :to="item.to"
+            class="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-100"
+            :class="isActive(item.to)
+              ? 'bg-blue-50 text-blue-700'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
+          >
+            <svg
+              class="h-4 w-4 flex-shrink-0"
+              :class="isActive(item.to) ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
+            </svg>
+            <span class="flex-1 truncate">{{ item.label }}</span>
+            <span
+              v-if="item.badge && item.badge > 0"
+              class="ml-auto flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1 text-[11px] font-semibold tabular-nums"
+              :class="isActive(item.to) ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'"
+            >
+              {{ item.badge }}
+            </span>
+          </NuxtLink>
+        </div>
+      </nav>
+
+      <!-- Footer -->
+      <div class="border-t border-gray-100 px-3 py-3 space-y-2.5">
+        <div class="flex items-center gap-2">
+          <div
+            class="h-1.5 w-1.5 rounded-full flex-shrink-0"
+            :class="{
+              'bg-emerald-500': health === 'ok',
+              'bg-red-400':     health === 'error',
+              'bg-amber-400 animate-pulse': health === 'checking',
+            }"
+          />
+          <span class="text-xs text-gray-400">
+            <template v-if="health === 'ok'">Backend connected</template>
+            <template v-else-if="health === 'error'">Backend offline</template>
+            <template v-else>Connecting…</template>
+          </span>
+        </div>
+        <div class="rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2">
+          <p class="text-xs text-emerald-700 font-medium leading-snug">
+            Never sends or applies automatically
+          </p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <slot />
+    </div>
+  </div>
+</template>

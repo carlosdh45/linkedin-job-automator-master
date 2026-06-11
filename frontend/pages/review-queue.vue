@@ -1,214 +1,3 @@
-<template>
-  <div class="flex-1 overflow-y-auto">
-    <!-- Header -->
-    <div class="sticky top-0 z-10 bg-slate-950/80 backdrop-blur border-b border-slate-800 px-8 py-4 flex items-center justify-between">
-      <div>
-        <h1 class="text-xl font-bold text-slate-100">Review Queue</h1>
-        <p class="text-xs text-slate-500 mt-0.5">{{ drafts.length }} draft{{ drafts.length !== 1 ? 's' : '' }} pending review</p>
-      </div>
-      <button
-        class="px-3 py-1.5 text-xs font-medium text-slate-400 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
-        @click="() => refresh()"
-      >
-        Refresh
-      </button>
-    </div>
-
-    <!-- Toast notifications -->
-    <div class="fixed top-4 right-4 z-50 space-y-2 pointer-events-none">
-      <Transition
-        v-for="n in notifications"
-        :key="n.id"
-        name="toast"
-      >
-        <div
-          :class="n.type === 'success' ? 'bg-emerald-800 border-emerald-700 text-emerald-100' : 'bg-red-900 border-red-800 text-red-100'"
-          class="pointer-events-auto px-4 py-3 rounded-xl border shadow-xl text-sm font-medium max-w-sm"
-        >
-          {{ n.message }}
-        </div>
-      </Transition>
-    </div>
-
-    <div class="px-8 py-6 space-y-4 max-w-4xl mx-auto">
-      <!-- Safety reminder -->
-      <div class="flex items-start gap-3 px-4 py-3 bg-blue-950/30 border border-blue-900/40 rounded-xl">
-        <svg class="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-        </svg>
-        <p class="text-sm text-blue-300">
-          <strong>Approve</strong> marks a draft as human-approved for your records — it does <strong>not</strong> send anything.
-          DobryBot never sends emails or applies to jobs automatically.
-        </p>
-      </div>
-
-      <LoadingSpinner v-if="pending" label="Loading queue…" />
-
-      <template v-else-if="error">
-        <div class="rounded-xl border border-red-900/50 bg-red-950/30 p-6 text-center">
-          <p class="text-red-400 font-medium">Could not load review queue.</p>
-          <button class="mt-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-sm text-slate-200 rounded-lg" @click="() => refresh()">Retry</button>
-        </div>
-      </template>
-
-      <template v-else>
-        <div v-if="drafts.length === 0" class="rounded-xl border border-slate-800 bg-slate-800/50 p-16 text-center">
-          <div class="w-12 h-12 rounded-full bg-emerald-900/40 flex items-center justify-center mx-auto mb-4">
-            <svg class="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
-          </div>
-          <p class="text-slate-300 font-semibold">Queue is empty</p>
-          <p class="text-sm text-slate-500 mt-1">No drafts are pending review. Run the CLI to generate outreach.</p>
-        </div>
-
-        <div v-else class="space-y-4">
-          <div
-            v-for="draft in drafts"
-            :key="draft.id"
-            class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden"
-            :class="{ 'opacity-50 pointer-events-none': processingId === draft.id }"
-          >
-            <!-- Card header -->
-            <div class="px-5 py-4 border-b border-slate-700 flex items-start justify-between gap-4">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">{{ draft.outreach_type }}</span>
-                  <span class="text-slate-700">·</span>
-                  <span class="text-xs text-slate-500">ID {{ draft.id }}</span>
-                  <StatusBadge :status="draft.quality_status || 'pending'" />
-                </div>
-                <h3 class="mt-1.5 text-base font-semibold text-slate-100 truncate">
-                  {{ draft.subject }}
-                </h3>
-                <p class="text-xs text-slate-500 mt-0.5">
-                  {{ draft.company }}
-                  <template v-if="draft.to_name"> · To: {{ draft.to_name }}</template>
-                  <template v-if="draft.to_role"> ({{ draft.to_role }})</template>
-                </p>
-              </div>
-            </div>
-
-            <!-- Quality scores -->
-            <div class="px-5 py-3 border-b border-slate-700/50 flex items-center gap-6 flex-wrap">
-              <div class="flex items-center gap-2">
-                <span class="text-xs text-slate-500">Personalization</span>
-                <span :class="draft.personalization_score >= 75 ? 'text-emerald-400' : draft.personalization_score >= 50 ? 'text-amber-400' : 'text-red-400'" class="text-sm font-bold tabular-nums">
-                  {{ draft.personalization_score }}<span class="text-slate-600 font-normal">/100</span>
-                </span>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs text-slate-500">Spam Risk</span>
-                <span :class="draft.spam_risk_score <= 35 ? 'text-emerald-400' : draft.spam_risk_score <= 60 ? 'text-amber-400' : 'text-red-400'" class="text-sm font-bold tabular-nums">
-                  {{ draft.spam_risk_score }}<span class="text-slate-600 font-normal">/100</span>
-                </span>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs text-slate-500">AI-sounding</span>
-                <span :class="draft.ai_sounding_score <= 40 ? 'text-emerald-400' : draft.ai_sounding_score <= 65 ? 'text-amber-400' : 'text-red-400'" class="text-sm font-bold tabular-nums">
-                  {{ draft.ai_sounding_score }}<span class="text-slate-600 font-normal">/100</span>
-                </span>
-              </div>
-              <div v-if="draft.quality_reasons && draft.quality_reasons.length > 0" class="text-xs text-slate-500 truncate max-w-xs">
-                ⚠ {{ draft.quality_reasons.join('; ') }}
-              </div>
-            </div>
-
-            <!-- Draft body preview -->
-            <div class="px-5 py-4 border-b border-slate-700/50">
-              <p class="text-sm text-slate-400 leading-relaxed whitespace-pre-line line-clamp-5">{{ draft.body }}</p>
-              <button
-                v-if="draft.body.length > 300"
-                class="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                @click="toggleExpanded(draft.id)"
-              >
-                {{ expanded.has(draft.id) ? 'Show less' : 'Show full draft' }}
-              </button>
-              <div v-if="expanded.has(draft.id)" class="mt-3 pt-3 border-t border-slate-700/50">
-                <p class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{{ draft.body }}</p>
-              </div>
-            </div>
-
-            <!-- Actions — NO send, NO apply -->
-            <div class="px-5 py-4 flex items-center gap-3 flex-wrap">
-              <!-- Approve (not send) -->
-              <button
-                :disabled="draft.quality_status !== 'passed'"
-                :title="draft.quality_status !== 'passed' ? 'Quality Guard not passed — cannot approve' : 'Mark as approved (not sent)'"
-                :class="draft.quality_status === 'passed' ? 'bg-emerald-700 hover:bg-emerald-600 text-white' : 'bg-slate-700 text-slate-500 cursor-not-allowed'"
-                class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                @click="draft.quality_status === 'passed' && openApprove(draft)"
-              >
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-                Approve Draft
-                <span class="text-xs opacity-70 font-normal">(not send)</span>
-              </button>
-
-              <!-- Skip -->
-              <button
-                class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
-                @click="openSkip(draft)"
-              >
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Skip
-              </button>
-
-              <!-- Needs Research -->
-              <button
-                class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-sky-900/40 hover:bg-sky-900/60 text-sky-400 border border-sky-800/50 transition-colors"
-                @click="openResearch(draft)"
-              >
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                </svg>
-                Needs Research
-              </button>
-            </div>
-          </div>
-        </div>
-      </template>
-    </div>
-
-    <!-- Approve confirmation -->
-    <ConfirmDialog
-      v-model="approveDialog.open"
-      title="Approve this draft?"
-      :message="`Approving marks the draft as human-reviewed and ready.\n\nThis does NOT send anything. You must manually send the message after approving.\n\nDraft: ${approveDialog.draft?.subject}`"
-      confirm-label="Approve (does not send)"
-      variant="success"
-      @confirm="doApprove"
-    />
-
-    <!-- Skip confirmation -->
-    <ConfirmDialog
-      v-model="skipDialog.open"
-      title="Skip this draft?"
-      :message="`The draft will be marked as skipped and removed from the review queue.\n\nDraft: ${skipDialog.draft?.subject}`"
-      confirm-label="Skip Draft"
-      variant="warning"
-      has-input
-      input-placeholder="Reason for skipping (optional)"
-      @confirm="doSkip"
-    />
-
-    <!-- Needs Research confirmation -->
-    <ConfirmDialog
-      v-model="researchDialog.open"
-      title="Flag for research?"
-      :message="`This draft will be flagged as needing additional research before it can be reviewed.\n\nDraft: ${researchDialog.draft?.subject}`"
-      confirm-label="Flag for Research"
-      variant="info"
-      has-input
-      input-placeholder="Research note (optional)"
-      @confirm="doResearch"
-    />
-  </div>
-</template>
-
 <script setup lang="ts">
 import type { Draft } from '~/types'
 
@@ -257,7 +46,7 @@ async function doApprove() {
   try {
     const result = await api.approveDraft(draft.id)
     if (result.approved) {
-      notify('success', `Draft "${draft.subject}" approved. Not sent — ready for manual delivery.`)
+      notify('success', `Draft approved. Not sent — ready for manual delivery.`)
       await refresh()
     } else {
       notify('error', result.reason || 'Approval blocked by Quality Guard.')
@@ -276,7 +65,7 @@ async function doSkip(reason: string) {
   processingId.value = draft.id
   try {
     await api.skipDraft(draft.id, reason || undefined)
-    notify('success', `Draft skipped.`)
+    notify('success', 'Draft skipped.')
     await refresh()
   } catch {
     notify('error', 'Could not skip draft.')
@@ -291,7 +80,7 @@ async function doResearch(note: string) {
   processingId.value = draft.id
   try {
     await api.markNeedsResearch(draft.id, note || undefined)
-    notify('success', `Draft flagged for research.`)
+    notify('success', 'Draft flagged for research.')
     await refresh()
   } catch {
     notify('error', 'Could not flag draft.')
@@ -301,6 +90,220 @@ async function doResearch(note: string) {
 }
 </script>
 
+<template>
+  <div class="flex-1 flex flex-col overflow-y-auto">
+    <PageHeader
+      :title="`Review Queue`"
+      :subtitle="`${drafts.length} draft${drafts.length !== 1 ? 's' : ''} pending review`"
+    >
+      <template #actions>
+        <button
+          class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          :disabled="pending"
+          @click="() => refresh()"
+        >
+          <svg class="h-3.5 w-3.5" :class="{ 'animate-spin': pending }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+          </svg>
+          Refresh
+        </button>
+      </template>
+    </PageHeader>
+
+    <!-- Toast notifications -->
+    <div class="fixed top-4 right-4 z-50 space-y-2 pointer-events-none">
+      <Transition v-for="n in notifications" :key="n.id" name="toast">
+        <div
+          class="pointer-events-auto px-4 py-3 rounded-xl border shadow-card-md text-sm font-medium max-w-sm"
+          :class="n.type === 'success'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            : 'bg-red-50 border-red-200 text-red-800'"
+        >
+          {{ n.message }}
+        </div>
+      </Transition>
+    </div>
+
+    <div class="flex-1 p-6 space-y-5 max-w-3xl w-full mx-auto">
+      <!-- Safety reminder -->
+      <div class="flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl">
+        <svg class="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+        </svg>
+        <p class="text-sm text-blue-700">
+          <strong>Approve</strong> marks a draft as human-approved for your records — it does <strong>not</strong> send anything.
+          DobryBot never sends emails or applies to jobs automatically.
+        </p>
+      </div>
+
+      <LoadingSpinner v-if="pending" label="Loading queue…" />
+
+      <template v-else-if="error">
+        <AppCard>
+          <ErrorState message="Could not load review queue." :show-retry="true" @retry="() => refresh()" />
+        </AppCard>
+      </template>
+
+      <template v-else>
+        <!-- Empty state -->
+        <AppCard v-if="!drafts.length">
+          <EmptyState title="Queue is empty" message="No drafts are pending review. Run the CLI to generate outreach.">
+            <template #icon>
+              <svg class="h-6 w-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </template>
+          </EmptyState>
+        </AppCard>
+
+        <!-- Draft cards -->
+        <div v-else class="space-y-4">
+          <div
+            v-for="draft in drafts"
+            :key="draft.id"
+            class="bg-white border border-gray-200 rounded-xl shadow-card overflow-hidden transition-opacity"
+            :class="{ 'opacity-50 pointer-events-none': processingId === draft.id }"
+          >
+            <!-- Card header -->
+            <div class="px-5 py-4 border-b border-gray-100">
+              <div class="flex items-center gap-2 flex-wrap mb-1.5">
+                <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">{{ draft.outreach_type }}</span>
+                <span class="text-gray-200">·</span>
+                <span class="text-xs text-gray-400">ID {{ draft.id }}</span>
+                <StatusBadge :status="draft.quality_status || 'pending'" />
+              </div>
+              <h3 class="text-base font-semibold text-gray-900 truncate">{{ draft.subject }}</h3>
+              <p class="text-xs text-gray-500 mt-0.5">
+                {{ draft.company }}
+                <template v-if="draft.to_name"> · To: {{ draft.to_name }}</template>
+                <template v-if="draft.to_role"> ({{ draft.to_role }})</template>
+              </p>
+            </div>
+
+            <!-- Quality scores -->
+            <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-6 flex-wrap bg-gray-50/50">
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">Personalization</span>
+                <span class="text-sm font-bold tabular-nums"
+                  :class="draft.personalization_score >= 75 ? 'text-emerald-600' : draft.personalization_score >= 50 ? 'text-amber-600' : 'text-red-500'">
+                  {{ draft.personalization_score }}<span class="text-gray-300 font-normal text-xs">/100</span>
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">Spam Risk</span>
+                <span class="text-sm font-bold tabular-nums"
+                  :class="draft.spam_risk_score <= 35 ? 'text-emerald-600' : draft.spam_risk_score <= 60 ? 'text-amber-600' : 'text-red-500'">
+                  {{ draft.spam_risk_score }}<span class="text-gray-300 font-normal text-xs">/100</span>
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">AI-sounding</span>
+                <span class="text-sm font-bold tabular-nums"
+                  :class="draft.ai_sounding_score <= 40 ? 'text-emerald-600' : draft.ai_sounding_score <= 65 ? 'text-amber-600' : 'text-red-500'">
+                  {{ draft.ai_sounding_score }}<span class="text-gray-300 font-normal text-xs">/100</span>
+                </span>
+              </div>
+              <div v-if="draft.quality_reasons?.length" class="text-xs text-amber-600 truncate max-w-xs">
+                ⚠ {{ draft.quality_reasons.join('; ') }}
+              </div>
+            </div>
+
+            <!-- Draft body preview -->
+            <div class="px-5 py-4 border-b border-gray-100">
+              <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-line" :class="{ 'line-clamp-5': !expanded.has(draft.id) }">
+                {{ draft.body }}
+              </p>
+              <button
+                v-if="draft.body.length > 300"
+                class="mt-2 text-xs text-blue-600 hover:text-blue-700 transition-colors font-medium"
+                @click="toggleExpanded(draft.id)"
+              >
+                {{ expanded.has(draft.id) ? 'Show less' : 'Show full draft' }}
+              </button>
+            </div>
+
+            <!-- Actions — NO send, NO apply -->
+            <div class="px-5 py-4 flex items-center gap-3 flex-wrap bg-gray-50/30">
+              <!-- Approve (not send) -->
+              <button
+                :disabled="draft.quality_status !== 'passed'"
+                :title="draft.quality_status !== 'passed' ? 'Quality Guard not passed — cannot approve' : 'Mark as approved (does not send)'"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                :class="draft.quality_status === 'passed'
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'"
+                @click="draft.quality_status === 'passed' && openApprove(draft)"
+              >
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                Approve Draft
+                <span class="text-xs opacity-75 font-normal">(not send)</span>
+              </button>
+
+              <!-- Skip -->
+              <button
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                @click="openSkip(draft)"
+              >
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Skip
+              </button>
+
+              <!-- Needs Research -->
+              <button
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 transition-colors"
+                @click="openResearch(draft)"
+              >
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+                Needs Research
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Approve confirmation -->
+    <ConfirmDialog
+      v-model="approveDialog.open"
+      title="Approve this draft?"
+      :message="`Approving marks the draft as human-reviewed and ready.\n\nThis does NOT send anything. You must manually send the message after approving.\n\nDraft: ${approveDialog.draft?.subject}`"
+      confirm-label="Approve (does not send)"
+      variant="success"
+      @confirm="doApprove"
+    />
+
+    <!-- Skip confirmation -->
+    <ConfirmDialog
+      v-model="skipDialog.open"
+      title="Skip this draft?"
+      :message="`The draft will be marked as skipped and removed from the queue.\n\nDraft: ${skipDialog.draft?.subject}`"
+      confirm-label="Skip Draft"
+      variant="warning"
+      has-input
+      input-placeholder="Reason for skipping (optional)"
+      @confirm="doSkip"
+    />
+
+    <!-- Needs Research confirmation -->
+    <ConfirmDialog
+      v-model="researchDialog.open"
+      title="Flag for research?"
+      :message="`This draft will be flagged as needing additional research before it can be reviewed.\n\nDraft: ${researchDialog.draft?.subject}`"
+      confirm-label="Flag for Research"
+      variant="info"
+      has-input
+      input-placeholder="Research note (optional)"
+      @confirm="doResearch"
+    />
+  </div>
+</template>
+
 <style scoped>
 .line-clamp-5 {
   display: -webkit-box;
@@ -308,6 +311,7 @@ async function doResearch(note: string) {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
 .toast-enter-active,
 .toast-leave-active {
   transition: all 0.2s ease;
