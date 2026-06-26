@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { statJobTotal, statJobScored, statLeadTotal, statLeadScored } from '~/types'
+import type { BDCompany } from '~/types'
 
 const api = useApi()
 const showSeedConfirm = ref(false)
 
 const { data: brief, pending, error, refresh } = await useAsyncData('dashboard', () => api.getDailyBrief())
+const { data: bdStats, refresh: refreshBD } = await useAsyncData('bd-dashboard', () => api.getBDDashboard(), {
+  default: () => null,
+})
+const { data: bdCompanies } = await useAsyncData<BDCompany[]>('bd-companies-dash', () => api.getBDCompanies(), {
+  default: () => [],
+})
 
 const today = computed(() =>
   brief.value?.date
@@ -21,34 +28,53 @@ const draftsGenerated = computed(() => stats.value.outreach_generated ?? 0)
 const reviewPending = computed(() => brief.value?.pending_drafts.total ?? 0)
 const approvable = computed(() => brief.value?.pending_drafts.approvable.length ?? 0)
 
-// Placeholder BD data — replaced by real intelligence in Phase 2
-const mockPainPointCompanies = [
-  { name: 'Meridian Labs', industry: 'DevTools / SaaS', painPoints: ['Manual deployment pipeline', 'Slow release cycles'], score: 89 },
-  { name: 'Vantage Capital', industry: 'FinTech', painPoints: ['Compliance reporting overhead', 'Data reconciliation delays'], score: 82 },
-  { name: 'Stratos Engineering', industry: 'Infrastructure', painPoints: ['Developer onboarding velocity', 'Tech debt accumulation'], score: 74 },
-  { name: 'Nexus Health', industry: 'HealthTech', painPoints: ['HIPAA audit prep', 'Legacy system integrations'], score: 68 },
-]
+// BD real data
+const bdQualifiedOpps = computed(() => bdStats.value?.qualified_opportunities ?? 0)
+const bdHighSignalProspects = computed(() => bdStats.value?.high_signal_prospects ?? 0)
+const bdDraftsForReview = computed(() => bdStats.value?.drafts_for_review ?? 0)
+const bdRecommendedActions = computed(() => bdStats.value?.recommended_actions ?? [])
+const bdPipelineSnapshot = computed(() => bdStats.value?.pipeline_snapshot ?? [])
 
-const mockPipelineStages = [
-  { label: 'Identified', color: 'gray', count: 0 },
-  { label: 'Researched', color: 'blue', count: 0 },
-  { label: 'Qualified', color: 'violet', count: 0 },
-  { label: 'Engaged', color: 'amber', count: 0 },
-  { label: 'Active', color: 'green', count: 0 },
-]
+const companiesWithPainPoints = computed(() =>
+  (bdCompanies.value ?? []).filter(c => c.pain_points.length > 0).slice(0, 6)
+)
+const hasRealBDData = computed(() =>
+  (bdCompanies.value?.length ?? 0) > 0 || bdQualifiedOpps.value > 0
+)
 
 const stageColorMap: Record<string, string> = {
-  gray: 'bg-gray-100 text-gray-600',
-  blue: 'bg-blue-50 text-blue-700',
-  violet: 'bg-violet-50 text-violet-700',
-  amber: 'bg-amber-50 text-amber-700',
-  green: 'bg-emerald-50 text-emerald-700',
+  identified: 'bg-gray-100 text-gray-600',
+  researched: 'bg-blue-50 text-blue-700',
+  qualified: 'bg-violet-50 text-violet-700',
+  outreach_ready: 'bg-indigo-50 text-indigo-700',
+  in_conversation: 'bg-amber-50 text-amber-700',
+  proposal: 'bg-orange-50 text-orange-700',
+  engaged: 'bg-amber-50 text-amber-700',
+  deal_packet: 'bg-orange-50 text-orange-700',
+  active: 'bg-emerald-50 text-emerald-700',
+  won: 'bg-emerald-100 text-emerald-800',
+  lost: 'bg-red-50 text-red-600',
+}
+
+const stageLabel: Record<string, string> = {
+  identified: 'Identified',
+  researched: 'Researched',
+  qualified: 'Qualified',
+  outreach_ready: 'Outreach Ready',
+  in_conversation: 'In Conversation',
+  proposal: 'Proposal',
+  engaged: 'Engaged',
+  deal_packet: 'Deal Packet',
+  active: 'Active',
+  won: 'Won',
+  lost: 'Lost',
 }
 
 async function seedDemo() {
   try {
     await api.seedDemo()
     await refresh()
+    await refreshBD()
   } catch {
     // non-critical
   }
@@ -104,29 +130,29 @@ async function seedDemo() {
         <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             title="Qualified Opportunities"
-            :value="opportunityQualified"
-            :sub="`${opportunityTotal} tracked total`"
+            :value="bdQualifiedOpps || opportunityQualified"
+            :sub="bdQualifiedOpps ? 'BD pipeline' : `${opportunityTotal} tracked total`"
             variant="blue"
             icon="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
           />
           <StatCard
             title="High Signal Prospects"
-            :value="prospectSignaled"
-            :sub="`${prospectTotal} prospects total`"
+            :value="bdHighSignalProspects || prospectSignaled"
+            :sub="bdHighSignalProspects ? 'BD prospects' : `${prospectTotal} prospects total`"
             variant="violet"
             icon="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
           />
           <StatCard
-            title="Outreach Drafts"
-            :value="draftsGenerated"
-            :sub="`${reviewPending} pending review`"
+            title="BD Drafts"
+            :value="bdDraftsForReview || draftsGenerated"
+            :sub="bdDraftsForReview ? 'pending manual review' : `${reviewPending} pending review`"
             variant="green"
             icon="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
           />
           <StatCard
             title="Awaiting Review"
-            :value="reviewPending"
-            :sub="reviewPending === 1 ? '1 draft needs your approval' : `${approvable} approvable now`"
+            :value="reviewPending + bdDraftsForReview"
+            :sub="bdDraftsForReview ? `${bdDraftsForReview} BD · ${reviewPending} job` : (reviewPending === 1 ? '1 draft needs your approval' : `${approvable} approvable now`)"
             variant="amber"
             icon="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
           />
@@ -219,7 +245,7 @@ async function seedDemo() {
               </table>
             </AppCard>
 
-            <!-- Companies with Pain Points (placeholder) -->
+            <!-- Companies with Pain Points -->
             <AppCard>
               <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
                 <div>
@@ -228,14 +254,11 @@ async function seedDemo() {
                 </div>
                 <NuxtLink to="/companies" class="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">View all →</NuxtLink>
               </div>
-              <!-- Placeholder indicator -->
-              <div class="mx-5 mt-3 mb-2 flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
-                <svg class="h-3.5 w-3.5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                </svg>
-                <span class="text-xs text-blue-700">Showing placeholder data — connect your intelligence sources in Phase 2</span>
+              <div v-if="!companiesWithPainPoints.length" class="px-5 py-8 text-center">
+                <p class="text-sm text-gray-400">No companies with pain points yet.</p>
+                <p class="text-xs text-gray-300 mt-1">Add companies and tag their pain points to surface them here.</p>
               </div>
-              <table class="app-table">
+              <table v-else class="app-table">
                 <thead>
                   <tr>
                     <th>Company</th>
@@ -245,15 +268,15 @@ async function seedDemo() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="co in mockPainPointCompanies" :key="co.name">
+                  <tr v-for="co in companiesWithPainPoints" :key="co.id">
                     <td>
                       <div class="font-medium text-gray-900">{{ co.name }}</div>
                     </td>
-                    <td class="hidden md:table-cell text-gray-500">{{ co.industry }}</td>
+                    <td class="hidden md:table-cell text-gray-500">{{ co.industry || '—' }}</td>
                     <td>
                       <div class="flex flex-wrap gap-1">
                         <span
-                          v-for="pp in co.painPoints"
+                          v-for="pp in co.pain_points.slice(0, 3)"
                           :key="pp"
                           class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-100"
                         >
@@ -261,7 +284,7 @@ async function seedDemo() {
                         </span>
                       </div>
                     </td>
-                    <td class="text-right font-semibold tabular-nums text-blue-600">{{ co.score }}</td>
+                    <td class="text-right font-semibold tabular-nums text-blue-600">{{ co.opportunity_score }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -271,22 +294,34 @@ async function seedDemo() {
           <!-- Right col (1/3) -->
           <div class="space-y-6">
 
-            <!-- Recommended Actions -->
+            <!-- Recommended Actions (BD-first if available) -->
             <AppCard>
               <div class="px-5 py-3.5 border-b border-gray-100">
                 <h2 class="text-sm font-semibold text-gray-900">Recommended Next Actions</h2>
                 <p class="text-xs text-gray-400 mt-0.5">Highest-priority moves for today</p>
               </div>
               <div class="px-5 py-4">
-                <p v-if="!brief.recommended_actions.length" class="text-sm text-gray-400">No actions suggested.</p>
-                <ol v-else class="space-y-3">
-                  <li v-for="(action, i) in brief.recommended_actions" :key="i" class="flex items-start gap-3">
-                    <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-blue-600 mt-0.5">
-                      {{ i + 1 }}
-                    </span>
-                    <span class="text-sm text-gray-700 leading-snug">{{ action }}</span>
-                  </li>
-                </ol>
+                <template v-if="bdRecommendedActions.length">
+                  <ol class="space-y-3">
+                    <li v-for="(action, i) in bdRecommendedActions" :key="i" class="flex items-start gap-3">
+                      <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-violet-50 text-xs font-semibold text-violet-600 mt-0.5">
+                        {{ i + 1 }}
+                      </span>
+                      <span class="text-sm text-gray-700 leading-snug">{{ action }}</span>
+                    </li>
+                  </ol>
+                </template>
+                <template v-else-if="brief.recommended_actions.length">
+                  <ol class="space-y-3">
+                    <li v-for="(action, i) in brief.recommended_actions" :key="i" class="flex items-start gap-3">
+                      <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-blue-600 mt-0.5">
+                        {{ i + 1 }}
+                      </span>
+                      <span class="text-sm text-gray-700 leading-snug">{{ action }}</span>
+                    </li>
+                  </ol>
+                </template>
+                <p v-else class="text-sm text-gray-400">No actions suggested — add companies and prospects to get started.</p>
               </div>
             </AppCard>
 
@@ -312,28 +347,31 @@ async function seedDemo() {
               </div>
             </AppCard>
 
-            <!-- Pipeline Snapshot (placeholder) -->
+            <!-- Pipeline Snapshot (real BD data) -->
             <AppCard>
               <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-900">Pipeline Snapshot</h2>
                 <NuxtLink to="/pipeline" class="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">View →</NuxtLink>
               </div>
               <div class="px-5 py-4 space-y-2">
-                <div
-                  v-for="stage in mockPipelineStages"
-                  :key="stage.label"
-                  class="flex items-center justify-between"
-                >
-                  <span class="text-sm text-gray-600">{{ stage.label }}</span>
-                  <span
-                    class="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full px-2 text-xs font-semibold tabular-nums"
-                    :class="stageColorMap[stage.color]"
+                <template v-if="bdPipelineSnapshot.length">
+                  <div
+                    v-for="stage in bdPipelineSnapshot"
+                    :key="stage.stage"
+                    class="flex items-center justify-between"
                   >
-                    {{ stage.count }}
-                  </span>
-                </div>
+                    <span class="text-sm text-gray-600">{{ stageLabel[stage.stage] ?? stage.stage }}</span>
+                    <span
+                      class="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full px-2 text-xs font-semibold tabular-nums"
+                      :class="stageColorMap[stage.stage] ?? 'bg-gray-100 text-gray-600'"
+                    >
+                      {{ stage.count }}
+                    </span>
+                  </div>
+                </template>
+                <p v-else class="text-sm text-gray-400">No active pipeline deals yet.</p>
                 <p class="text-xs text-gray-400 pt-1 border-t border-gray-100">
-                  Pipeline tracking activates in Phase 2
+                  Move opportunities through stages on the <NuxtLink to="/pipeline" class="text-blue-600 hover:underline">Pipeline page</NuxtLink>
                 </p>
               </div>
             </AppCard>

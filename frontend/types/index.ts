@@ -329,6 +329,8 @@ export interface BDDealPacket {
   updated_at: string | null
 }
 
+export type OutreachDraftStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'needs_research'
+
 export interface BDOutreachDraft {
   id: string
   company_name: string
@@ -343,8 +345,74 @@ export interface BDOutreachDraft {
   spam_risk_score: number
   ai_sounding_score: number
   quality_status: string
-  status: string
+  status: OutreachDraftStatus
+  notes: string
   created_at: string
+  updated_at: string | null
+}
+
+export interface BDOutreachDraftCreate {
+  company_name: string
+  contact_name: string
+  contact_role?: string
+  message_type?: MessageType
+  subject?: string | null
+  body: string
+  tone?: string
+  angle?: string | null
+  personalization_score?: number
+  spam_risk_score?: number
+  ai_sounding_score?: number
+  notes?: string
+}
+
+export interface BDActivity {
+  id: string
+  entity_type: string
+  entity_id: string
+  action: string
+  description: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface BDICPConfig {
+  target_industries: string[]
+  company_size_min: number | null
+  company_size_max: number | null
+  target_roles: string[]
+  pain_point_priorities: string[]
+  signal_priorities: string[]
+  scoring_weights: Record<string, number>
+  updated_at: string
+}
+
+export interface BDICPConfigUpdate {
+  target_industries?: string[]
+  company_size_min?: number | null
+  company_size_max?: number | null
+  target_roles?: string[]
+  pain_point_priorities?: string[]
+  signal_priorities?: string[]
+  scoring_weights?: Record<string, number>
+}
+
+export interface BDDashboardStats {
+  qualified_opportunities: number
+  hot_opportunities: number
+  high_signal_prospects: number
+  companies_with_pain_points: number
+  drafts_for_review: number
+  approved_drafts: number
+  pipeline_snapshot: Array<{ stage: string; count: number }>
+  recommended_actions: string[]
+}
+
+export interface BDMoveStageResponse {
+  id: string
+  previous_stage: string
+  new_stage: string
+  activity_id: string
 }
 
 export interface BDPipelineDeal {

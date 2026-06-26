@@ -74,3 +74,11 @@ def get_bd_deal_packet_path() -> str:
 
 def get_bd_outreach_path() -> str:
     return os.environ.get("DOBRYBOT_BD_OUTREACH_PATH", "data/bd_outreach_drafts.json")
+
+
+def get_bd_activity_path() -> str:
+    return os.environ.get("DOBRYBOT_BD_ACTIVITY_PATH", "data/bd_activity.json")
+
+
+def get_bd_icp_config_path() -> str:
+    return os.environ.get("DOBRYBOT_BD_ICP_CONFIG_PATH", "data/bd_icp_config.json")

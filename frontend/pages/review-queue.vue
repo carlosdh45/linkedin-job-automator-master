@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import type { Draft } from '~/types'
+import type { Draft, BDOutreachDraft } from '~/types'
 
 const api = useApi()
 const reviewCount = useReviewCount()
+
+const activeQueueTab = ref<'jobs' | 'bd'>('jobs')
 
 const expanded = ref(new Set<number>())
 const processingId = ref<number | null>(null)
@@ -15,8 +17,45 @@ const skipDialog = reactive({ open: false, draft: null as Draft | null })
 const researchDialog = reactive({ open: false, draft: null as Draft | null })
 
 const { data, pending, error, refresh } = await useAsyncData('review-queue', () => api.getReviewQueue())
+const { data: bdDrafts, pending: bdPending, refresh: refreshBD } = await useAsyncData<BDOutreachDraft[]>(
+  'bd-review-queue',
+  () => api.getOutreachDrafts(),
+  { default: () => [] }
+)
 
 const drafts = computed<Draft[]>(() => data.value?.drafts ?? [])
+const pendingBDDrafts = computed(() => (bdDrafts.value ?? []).filter(d => d.status === 'draft' || d.status === 'pending_review'))
+
+const bdStatusColor: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-600',
+  pending_review: 'bg-amber-50 text-amber-700',
+  approved: 'bg-emerald-50 text-emerald-700',
+  rejected: 'bg-red-50 text-red-700',
+  needs_research: 'bg-sky-50 text-sky-700',
+}
+const bdStatusLabel: Record<string, string> = {
+  draft: 'Draft',
+  pending_review: 'Pending Review',
+  approved: 'Approved — Manual Execution Only',
+  rejected: 'Rejected',
+  needs_research: 'Needs Research',
+}
+
+async function approveBDDraft(id: string) {
+  await api.approveOutreachDraft(id)
+  await refreshBD()
+  notify('success', 'Draft approved for manual execution. Nothing was sent.')
+}
+async function rejectBDDraft(id: string) {
+  await api.rejectOutreachDraft(id)
+  await refreshBD()
+  notify('success', 'Draft rejected.')
+}
+async function flagBDResearch(id: string) {
+  await api.markOutreachDraftNeedsResearch(id)
+  await refreshBD()
+  notify('success', 'Draft flagged for research.')
+}
 
 watch(() => data.value?.total, (total) => {
   if (total !== undefined) reviewCount.value = total
@@ -94,15 +133,15 @@ async function doResearch(note: string) {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
       :title="`Review Queue`"
-      :subtitle="`${drafts.length} draft${drafts.length !== 1 ? 's' : ''} pending review`"
+      :subtitle="`${drafts.length} job draft${drafts.length !== 1 ? 's' : ''} · ${pendingBDDrafts.length} BD outreach draft${pendingBDDrafts.length !== 1 ? 's' : ''} pending review`"
     >
       <template #actions>
         <button
           class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-          :disabled="pending"
-          @click="() => refresh()"
+          :disabled="pending || bdPending"
+          @click="() => { refresh(); refreshBD() }"
         >
-          <svg class="h-3.5 w-3.5" :class="{ 'animate-spin': pending }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg class="h-3.5 w-3.5" :class="{ 'animate-spin': pending || bdPending }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
           </svg>
           Refresh
@@ -125,6 +164,27 @@ async function doResearch(note: string) {
     </div>
 
     <div class="flex-1 p-6 space-y-5 max-w-3xl w-full mx-auto">
+
+      <!-- Queue tabs -->
+      <div class="flex gap-1 border-b border-gray-200">
+        <button
+          class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+          :class="activeQueueTab === 'jobs' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
+          @click="activeQueueTab = 'jobs'"
+        >
+          Job Outreach
+          <span v-if="drafts.length" class="ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-blue-50 text-blue-700">{{ drafts.length }}</span>
+        </button>
+        <button
+          class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+          :class="activeQueueTab === 'bd' ? 'border-violet-600 text-violet-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
+          @click="activeQueueTab = 'bd'"
+        >
+          BD Outreach
+          <span v-if="pendingBDDrafts.length" class="ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-violet-50 text-violet-700">{{ pendingBDDrafts.length }}</span>
+        </button>
+      </div>
+
       <!-- Safety reminder -->
       <div class="flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl">
         <svg class="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -136,25 +196,27 @@ async function doResearch(note: string) {
         </p>
       </div>
 
-      <LoadingSpinner v-if="pending" label="Loading queue…" />
+      <!-- Jobs tab -->
+      <template v-if="activeQueueTab === 'jobs'">
+        <LoadingSpinner v-if="pending" label="Loading queue…" />
 
-      <template v-else-if="error">
-        <AppCard>
-          <ErrorState message="Could not load review queue." :show-retry="true" @retry="() => refresh()" />
-        </AppCard>
-      </template>
+        <template v-else-if="error">
+          <AppCard>
+            <ErrorState message="Could not load review queue." :show-retry="true" @retry="() => refresh()" />
+          </AppCard>
+        </template>
 
-      <template v-else>
-        <!-- Empty state -->
-        <AppCard v-if="!drafts.length">
-          <EmptyState title="Queue is empty" message="No drafts are pending review. Run the CLI to generate outreach.">
-            <template #icon>
-              <svg class="h-6 w-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-            </template>
-          </EmptyState>
-        </AppCard>
+        <template v-else>
+          <!-- Empty state -->
+          <AppCard v-if="!drafts.length">
+            <EmptyState title="Queue is empty" message="No job outreach drafts are pending review. Run the CLI to generate outreach.">
+              <template #icon>
+                <svg class="h-6 w-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </template>
+            </EmptyState>
+          </AppCard>
 
         <!-- Draft cards -->
         <div v-else class="space-y-4">
@@ -265,7 +327,96 @@ async function doResearch(note: string) {
             </div>
           </div>
         </div>
+        </template>
       </template>
+
+      <!-- BD Outreach tab -->
+      <template v-else-if="activeQueueTab === 'bd'">
+        <LoadingSpinner v-if="bdPending" label="Loading BD drafts…" />
+
+        <template v-else>
+          <AppCard v-if="!pendingBDDrafts.length">
+            <EmptyState title="No BD drafts pending" message="Generate and save outreach drafts in Message Studio to review them here.">
+              <template #icon>
+                <svg class="h-6 w-6 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                </svg>
+              </template>
+            </EmptyState>
+          </AppCard>
+
+          <div v-else class="space-y-4">
+            <div
+              v-for="draft in pendingBDDrafts"
+              :key="draft.id"
+              class="bg-white border border-gray-200 rounded-xl shadow-card overflow-hidden"
+            >
+              <!-- Header -->
+              <div class="px-5 py-4 border-b border-gray-100">
+                <div class="flex items-center gap-2 flex-wrap mb-1.5">
+                  <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">{{ draft.message_type }}</span>
+                  <span
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
+                    :class="bdStatusColor[draft.status] ?? 'bg-gray-100 text-gray-600'"
+                  >
+                    {{ bdStatusLabel[draft.status] ?? draft.status }}
+                  </span>
+                </div>
+                <h3 class="text-base font-semibold text-gray-900">{{ draft.company_name }}</h3>
+                <p class="text-xs text-gray-500 mt-0.5">{{ draft.contact_name }}{{ draft.contact_role ? ` · ${draft.contact_role}` : '' }}</p>
+                <p v-if="draft.subject" class="text-xs text-gray-500 mt-1 font-medium">{{ draft.subject }}</p>
+              </div>
+
+              <!-- Angle / tone -->
+              <div class="px-5 py-2.5 border-b border-gray-100 bg-gray-50/40 flex flex-wrap gap-4">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs text-gray-400">Tone</span>
+                  <span class="text-xs font-medium text-gray-700 capitalize">{{ draft.tone }}</span>
+                </div>
+                <div v-if="draft.angle" class="flex items-center gap-1.5">
+                  <span class="text-xs text-gray-400">Angle</span>
+                  <span class="text-xs font-medium text-gray-700">{{ draft.angle }}</span>
+                </div>
+              </div>
+
+              <!-- Body -->
+              <div class="px-5 py-4 border-b border-gray-100">
+                <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-line line-clamp-5">{{ draft.body }}</p>
+              </div>
+
+              <!-- Actions — NO send, NO auto-anything -->
+              <div class="px-5 py-4 flex items-center gap-3 flex-wrap bg-gray-50/30">
+                <button
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                  @click="approveBDDraft(draft.id)"
+                >
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                  Approve Draft
+                  <span class="text-xs opacity-75 font-normal">(manual execution only)</span>
+                </button>
+                <button
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                  @click="rejectBDDraft(draft.id)"
+                >
+                  Reject
+                </button>
+                <button
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 transition-colors"
+                  @click="flagBDResearch(draft.id)"
+                >
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                  </svg>
+                  Needs Research
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </template>
+
     </div>
 
     <!-- Approve confirmation -->

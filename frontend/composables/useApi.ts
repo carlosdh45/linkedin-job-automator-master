@@ -7,6 +7,9 @@ import type {
   ResumeQualityReport,
   BDCompany, BDProspect, BDSignal, BDOpportunity, BDDealPacket,
   BDPipelineResponse,
+  BDOutreachDraft, BDOutreachDraftCreate,
+  BDActivity, BDICPConfig, BDICPConfigUpdate,
+  BDDashboardStats, BDMoveStageResponse,
 } from '~/types'
 
 export const useApi = () => {
@@ -126,5 +129,34 @@ export const useApi = () => {
     // BD OS — Demo
     seedBDDemo: () => post<{ seeded: boolean; stats: Record<string, number> }>('/api/bd/demo/seed'),
     clearBDDemo: () => post<{ cleared: boolean }>('/api/bd/demo/clear'),
+    // BD OS — Outreach Drafts
+    getOutreachDrafts: () => get<BDOutreachDraft[]>('/api/bd/outreach-drafts'),
+    getOutreachDraft: (id: string) => get<BDOutreachDraft>(`/api/bd/outreach-drafts/${id}`),
+    createOutreachDraft: (data: BDOutreachDraftCreate) => post<BDOutreachDraft>('/api/bd/outreach-drafts', data),
+    updateOutreachDraft: (id: string, data: Partial<BDOutreachDraftCreate> & { status?: string }) =>
+      put<BDOutreachDraft>(`/api/bd/outreach-drafts/${id}`, data),
+    approveOutreachDraft: (id: string) =>
+      post<BDOutreachDraft>(`/api/bd/outreach-drafts/${id}/approve`),
+    rejectOutreachDraft: (id: string) =>
+      post<BDOutreachDraft>(`/api/bd/outreach-drafts/${id}/reject`),
+    markOutreachDraftNeedsResearch: (id: string) =>
+      post<BDOutreachDraft>(`/api/bd/outreach-drafts/${id}/needs-research`),
+    // BD OS — Activity
+    getBDActivity: (params?: { entity_type?: string; entity_id?: string; limit?: number }) => {
+      const q = new URLSearchParams()
+      if (params?.entity_type) q.set('entity_type', params.entity_type)
+      if (params?.entity_id) q.set('entity_id', params.entity_id)
+      if (params?.limit) q.set('limit', String(params.limit))
+      const qs = q.toString()
+      return get<BDActivity[]>(qs ? `/api/bd/activity?${qs}` : '/api/bd/activity')
+    },
+    // BD OS — ICP Config
+    getICPConfig: () => get<BDICPConfig>('/api/bd/icp-config'),
+    updateICPConfig: (data: BDICPConfigUpdate) => put<BDICPConfig>('/api/bd/icp-config', data),
+    // BD OS — Dashboard Stats
+    getBDDashboard: () => get<BDDashboardStats>('/api/bd/dashboard'),
+    // BD OS — Move Stage
+    moveBDOpportunityStage: (id: string, stage: string) =>
+      post<BDMoveStageResponse>(`/api/bd/opportunities/${id}/move-stage`, { stage }),
   }
 }

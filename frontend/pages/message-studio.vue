@@ -10,9 +10,12 @@ const activeTab = ref<'compose' | 'drafts'>('compose')
 const selectedType = ref<MessageType>('email')
 const selectedTone = ref<ToneType>('warm')
 const isGenerating = ref(false)
+const isSaving = ref(false)
 const generatedDraft = ref<string | null>(null)
 const generatedSubject = ref<string | null>(null)
 const generateError = ref<string | null>(null)
+const saveError = ref<string | null>(null)
+const saveSuccess = ref(false)
 
 const draftContext = ref({
   company: 'Meridian Labs',
@@ -22,9 +25,9 @@ const draftContext = ref({
   angle: 'CI/CD automation and engineering efficiency',
 })
 
-const { data: savedDrafts, pending: draftsPending } = await useAsyncData<BDOutreachDraft[]>(
+const { data: savedDrafts, pending: draftsPending, refresh: refreshDrafts } = await useAsyncData<BDOutreachDraft[]>(
   'bd-outreach-drafts',
-  () => api.getBDSignals().then(() => [] as BDOutreachDraft[]),
+  () => api.getOutreachDrafts(),
   { default: () => [] }
 )
 
@@ -45,6 +48,7 @@ const displayDraft = computed(() => generatedDraft.value ?? '')
 
 async function generateDraft() {
   generateError.value = null
+  saveSuccess.value = false
   isGenerating.value = true
   try {
     const result = await api.generateBDDraft({
@@ -65,10 +69,60 @@ async function generateDraft() {
   }
 }
 
+async function saveDraft() {
+  if (!generatedDraft.value) return
+  saveError.value = null
+  saveSuccess.value = false
+  isSaving.value = true
+  try {
+    await api.createOutreachDraft({
+      company_name: draftContext.value.company,
+      contact_name: draftContext.value.contact,
+      contact_role: draftContext.value.role,
+      message_type: selectedType.value,
+      subject: generatedSubject.value ?? undefined,
+      body: generatedDraft.value,
+      tone: selectedTone.value,
+      angle: draftContext.value.angle || undefined,
+    })
+    saveSuccess.value = true
+    await refreshDrafts()
+  } catch {
+    saveError.value = 'Could not save draft.'
+  } finally {
+    isSaving.value = false
+  }
+}
+
 const statusColor: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
-  review: 'bg-amber-50 text-amber-700',
+  pending_review: 'bg-amber-50 text-amber-700',
   approved: 'bg-emerald-50 text-emerald-700',
+  rejected: 'bg-red-50 text-red-700',
+  needs_research: 'bg-sky-50 text-sky-700',
+}
+
+const statusLabel: Record<string, string> = {
+  draft: 'Draft',
+  pending_review: 'Pending Review',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  needs_research: 'Needs Research',
+}
+
+async function approveDraft(id: string) {
+  await api.approveOutreachDraft(id)
+  await refreshDrafts()
+}
+
+async function rejectDraft(id: string) {
+  await api.rejectOutreachDraft(id)
+  await refreshDrafts()
+}
+
+async function flagResearch(id: string) {
+  await api.markOutreachDraftNeedsResearch(id)
+  await refreshDrafts()
 }
 </script>
 
@@ -76,7 +130,7 @@ const statusColor: Record<string, string> = {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
       title="Message Studio"
-      subtitle="Compose and review personalized BD outreach — all drafts require explicit approval"
+      subtitle="Compose and review personalized BD outreach — all drafts require explicit manual approval"
     >
       <template #actions>
         <span class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-700">
@@ -89,7 +143,7 @@ const statusColor: Record<string, string> = {
       <!-- Tab switcher -->
       <div class="flex gap-1 border-b border-gray-200">
         <button
-          v-for="tab in [{ key: 'compose', label: 'Compose' }, { key: 'drafts', label: 'Saved Drafts' }]"
+          v-for="tab in [{ key: 'compose', label: 'Compose' }, { key: 'drafts', label: `Saved Drafts${savedDrafts?.length ? ` (${savedDrafts.length})` : ''}` }]"
           :key="tab.key"
           class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
           :class="activeTab === tab.key
@@ -198,6 +252,22 @@ const statusColor: Record<string, string> = {
                   {{ generatedSubject }}
                 </div>
                 <pre class="whitespace-pre-wrap font-sans text-sm text-gray-700 leading-relaxed">{{ displayDraft }}</pre>
+
+                <!-- Save action -->
+                <div class="mt-4 pt-4 border-t border-gray-100 flex items-center gap-3">
+                  <button
+                    class="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isSaving"
+                    @click="saveDraft"
+                  >
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M17 16v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2M9 12l3 3 3-3M12 3v12" />
+                    </svg>
+                    {{ isSaving ? 'Saving…' : 'Save Draft for Review' }}
+                  </button>
+                  <span v-if="saveSuccess" class="text-xs text-emerald-600 font-medium">Saved — visible in Saved Drafts tab</span>
+                  <span v-if="saveError" class="text-xs text-red-600">{{ saveError }}</span>
+                </div>
               </div>
             </AppCard>
 
@@ -208,7 +278,7 @@ const statusColor: Record<string, string> = {
               </svg>
               <div>
                 <p class="text-sm font-medium text-emerald-800">Human-in-the-loop — always</p>
-                <p class="text-xs text-emerald-700 mt-0.5">Drafts are generated locally using rule-based templates. No AI calls. No external APIs. DobryBot does not send or post anything automatically. All outreach requires your explicit approval.</p>
+                <p class="text-xs text-emerald-700 mt-0.5">Drafts are generated locally using rule-based templates. No AI calls. No external APIs. DobryBot does not send or post anything automatically. All outreach requires your explicit manual approval before execution.</p>
               </div>
             </div>
           </div>
@@ -217,11 +287,74 @@ const statusColor: Record<string, string> = {
 
       <!-- Saved drafts tab -->
       <template v-else>
-        <AppCard>
-          <div class="px-5 py-4 text-center text-sm text-gray-400">
-            Saved draft tracking connects in Phase 10 when outreach drafts are persisted through the Review Queue.
+        <div v-if="draftsPending" class="py-8 text-center text-sm text-gray-400">Loading drafts…</div>
+
+        <div v-else-if="!savedDrafts?.length">
+          <AppCard>
+            <div class="px-5 py-10 text-center">
+              <p class="text-sm text-gray-400">No saved drafts yet.</p>
+              <p class="text-xs text-gray-300 mt-1">Generate a draft in the Compose tab, then click "Save Draft for Review".</p>
+            </div>
+          </AppCard>
+        </div>
+
+        <div v-else class="space-y-4">
+          <div
+            v-for="draft in savedDrafts"
+            :key="draft.id"
+            class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden"
+          >
+            <!-- Header -->
+            <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">{{ draft.message_type }}</span>
+                  <span
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
+                    :class="statusColor[draft.status] ?? 'bg-gray-100 text-gray-600'"
+                  >
+                    {{ statusLabel[draft.status] ?? draft.status }}
+                  </span>
+                </div>
+                <p class="text-sm font-semibold text-gray-900">{{ draft.company_name }} — {{ draft.contact_name }}</p>
+                <p class="text-xs text-gray-400 mt-0.5">{{ draft.contact_role }}</p>
+                <p v-if="draft.subject" class="text-xs text-gray-500 mt-1 font-medium">{{ draft.subject }}</p>
+              </div>
+              <span class="text-xs text-gray-300 flex-shrink-0">{{ new Date(draft.created_at).toLocaleDateString() }}</span>
+            </div>
+
+            <!-- Body preview -->
+            <div class="px-5 py-3 border-b border-gray-100">
+              <p class="text-sm text-gray-600 line-clamp-3 whitespace-pre-line">{{ draft.body }}</p>
+            </div>
+
+            <!-- Actions — no send button -->
+            <div class="px-5 py-3 flex items-center gap-2 flex-wrap bg-gray-50/40">
+              <button
+                v-if="draft.status === 'draft' || draft.status === 'pending_review'"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition-colors"
+                @click="approveDraft(draft.id)"
+              >
+                Approve for Manual Execution
+              </button>
+              <button
+                v-if="draft.status !== 'rejected'"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                @click="rejectDraft(draft.id)"
+              >
+                Reject
+              </button>
+              <button
+                v-if="draft.status !== 'needs_research'"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 border border-sky-200 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-100 transition-colors"
+                @click="flagResearch(draft.id)"
+              >
+                Needs Research
+              </button>
+              <span class="ml-auto text-[10px] text-gray-300 italic">Approved ≠ Sent. All execution is manual.</span>
+            </div>
           </div>
-        </AppCard>
+        </div>
       </template>
     </div>
   </div>

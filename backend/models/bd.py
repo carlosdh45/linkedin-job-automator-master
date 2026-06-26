@@ -255,7 +255,9 @@ class BDOutreachDraft(BaseModel):
     ai_sounding_score: int = 0
     quality_status: str = "draft"
     status: str = "draft"
+    notes: str = ""
     created_at: str = Field(default_factory=_now)
+    updated_at: Optional[str] = None
 
 
 class BDMessageDraftRequest(BaseModel):
@@ -274,6 +276,119 @@ class BDMessageDraftResponse(BaseModel):
     safety_notice: str
     message_type: str
     tone: str
+
+
+# ── Outreach Draft (extended) ─────────────────────────────────────────────────
+
+class BDOutreachDraftCreate(BaseModel):
+    company_name: str
+    contact_name: str
+    contact_role: str = ""
+    message_type: str = "email"
+    subject: Optional[str] = None
+    body: str
+    tone: str = "warm"
+    angle: Optional[str] = None
+    personalization_score: int = 0
+    spam_risk_score: int = 0
+    ai_sounding_score: int = 0
+    notes: str = ""
+
+
+class BDOutreachDraftUpdate(BaseModel):
+    subject: Optional[str] = None
+    body: Optional[str] = None
+    tone: Optional[str] = None
+    angle: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
+# ── Activity Log ──────────────────────────────────────────────────────────────
+
+class BDActivity(BaseModel):
+    id: str = Field(default_factory=_uid)
+    entity_type: str  # "draft" | "opportunity" | "deal_packet"
+    entity_id: str
+    action: str
+    description: str
+    metadata: dict = Field(default_factory=dict)
+    created_at: str = Field(default_factory=_now)
+
+
+class BDActivityCreate(BaseModel):
+    entity_type: str
+    entity_id: str
+    action: str
+    description: str
+    metadata: dict = Field(default_factory=dict)
+
+
+# ── ICP Configuration ─────────────────────────────────────────────────────────
+
+class BDICPConfig(BaseModel):
+    target_industries: List[str] = Field(default_factory=list)
+    company_size_min: Optional[int] = None
+    company_size_max: Optional[int] = None
+    target_roles: List[str] = Field(default_factory=list)
+    pain_point_priorities: List[str] = Field(default_factory=list)
+    signal_priorities: List[str] = Field(default_factory=list)
+    scoring_weights: dict = Field(default_factory=lambda: {
+        "icp_match": 30,
+        "pain_points": 20,
+        "signals": 20,
+        "seniority": 15,
+        "urgency": 10,
+        "existing_relationship": 5,
+    })
+    updated_at: str = Field(default_factory=_now)
+
+
+class BDICPConfigUpdate(BaseModel):
+    target_industries: Optional[List[str]] = None
+    company_size_min: Optional[int] = None
+    company_size_max: Optional[int] = None
+    target_roles: Optional[List[str]] = None
+    pain_point_priorities: Optional[List[str]] = None
+    signal_priorities: Optional[List[str]] = None
+    scoring_weights: Optional[dict] = None
+
+
+# ── Move Stage ────────────────────────────────────────────────────────────────
+
+_VALID_STAGES = frozenset({
+    "identified", "researched", "qualified", "outreach_ready",
+    "in_conversation", "proposal", "engaged", "deal_packet", "active", "won", "lost",
+})
+
+
+class BDMoveStageRequest(BaseModel):
+    stage: str
+
+    def validate_stage(self) -> str:
+        if self.stage not in _VALID_STAGES:
+            raise ValueError(f"Invalid stage: {self.stage}. Valid: {sorted(_VALID_STAGES)}")
+        return self.stage
+
+
+class BDMoveStageResponse(BaseModel):
+    id: str
+    previous_stage: str
+    new_stage: str
+    activity_id: str
+
+
+# ── Dashboard Stats ───────────────────────────────────────────────────────────
+
+class BDDashboardStats(BaseModel):
+    qualified_opportunities: int = 0
+    hot_opportunities: int = 0
+    high_signal_prospects: int = 0
+    companies_with_pain_points: int = 0
+    drafts_for_review: int = 0
+    approved_drafts: int = 0
+    pipeline_snapshot: List[dict] = Field(default_factory=list)
+    recommended_actions: List[str] = Field(default_factory=list)
 
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────

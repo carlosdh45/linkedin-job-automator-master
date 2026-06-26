@@ -42,5 +42,19 @@ def clear_drafts(path: str) -> None:
     _save(path, [])
 
 
+def update_draft(path: str, draft_id: str, updates: dict) -> Optional[BDOutreachDraft]:
+    from datetime import datetime
+    items = _load(path)
+    for i, d in enumerate(items):
+        if d.id == draft_id:
+            merged = d.model_dump()
+            merged.update({k: v for k, v in updates.items() if v is not None})
+            merged["updated_at"] = datetime.utcnow().isoformat()
+            items[i] = BDOutreachDraft(**merged)
+            _save(path, items)
+            return items[i]
+    return None
+
+
 def replace_all(path: str, drafts: List[BDOutreachDraft]) -> None:
     _save(path, drafts)

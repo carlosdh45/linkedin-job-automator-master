@@ -28,6 +28,10 @@ from backend.api import (
     bd_pipeline,
     bd_demo,
     bd_message_studio,
+    bd_outreach_drafts,
+    bd_activity,
+    bd_icp,
+    bd_dashboard,
 )
 
 logger = logging.getLogger(__name__)
@@ -79,3 +83,7 @@ app.include_router(bd_deal_packets.router, prefix="/api")
 app.include_router(bd_pipeline.router, prefix="/api")
 app.include_router(bd_demo.router, prefix="/api")
 app.include_router(bd_message_studio.router, prefix="/api")
+app.include_router(bd_outreach_drafts.router, prefix="/api")
+app.include_router(bd_activity.router, prefix="/api")
+app.include_router(bd_icp.router, prefix="/api")
+app.include_router(bd_dashboard.router, prefix="/api")
