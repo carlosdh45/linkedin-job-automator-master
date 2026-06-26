@@ -40,6 +40,18 @@ def create_signal(path: str, data: dict) -> BDSignal:
     return signal
 
 
+def update_signal(path: str, signal_id: str, updates: dict) -> Optional[BDSignal]:
+    items = _load(path)
+    for i, s in enumerate(items):
+        if s.id == signal_id:
+            merged = s.model_dump()
+            merged.update({k: v for k, v in updates.items() if v is not None})
+            items[i] = BDSignal(**merged)
+            _save(path, items)
+            return items[i]
+    return None
+
+
 def clear_signals(path: str) -> None:
     _save(path, [])
 

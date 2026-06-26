@@ -10,6 +10,11 @@ import type {
   BDOutreachDraft, BDOutreachDraftCreate,
   BDActivity, BDICPConfig, BDICPConfigUpdate,
   BDDashboardStats, BDMoveStageResponse,
+  BDRecommendation,
+  BDSignalEvaluationResult,
+  BDCompanyEvaluationResult,
+  BDOpportunityRecalculateResult,
+  BDRecommendationRefreshResult,
 } from '~/types'
 
 export const useApi = () => {
@@ -158,5 +163,32 @@ export const useApi = () => {
     // BD OS — Move Stage
     moveBDOpportunityStage: (id: string, stage: string) =>
       post<BDMoveStageResponse>(`/api/bd/opportunities/${id}/move-stage`, { stage }),
+    // BD OS — Signal Intelligence (Phase 11)
+    evaluateBDSignal: (id: string) =>
+      post<BDSignalEvaluationResult>(`/api/bd/signals/${id}/evaluate`),
+    evaluateBDCompany: (id: string) =>
+      post<BDCompanyEvaluationResult>(`/api/bd/companies/${id}/evaluate`),
+    recalculateBDOpportunity: (id: string) =>
+      post<BDOpportunityRecalculateResult>(`/api/bd/opportunities/${id}/recalculate`),
+    getBDRecommendations: (params?: {
+      status?: string
+      entity_type?: string
+      priority?: string
+      limit?: number
+    }) => {
+      const q = new URLSearchParams()
+      if (params?.status) q.set('status', params.status)
+      if (params?.entity_type) q.set('entity_type', params.entity_type)
+      if (params?.priority) q.set('priority', params.priority)
+      if (params?.limit) q.set('limit', String(params.limit))
+      const qs = q.toString()
+      return get<BDRecommendation[]>(qs ? `/api/bd/recommendations?${qs}` : '/api/bd/recommendations')
+    },
+    refreshBDRecommendations: () =>
+      post<BDRecommendationRefreshResult>('/api/bd/recommendations/refresh'),
+    dismissBDRecommendation: (id: string) =>
+      post<BDRecommendation>(`/api/bd/recommendations/${id}/dismiss`),
+    actionBDRecommendation: (id: string) =>
+      post<BDRecommendation>(`/api/bd/recommendations/${id}/action`),
   }
 }

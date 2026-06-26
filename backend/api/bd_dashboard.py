@@ -6,12 +6,14 @@ from fastapi import APIRouter, Depends
 from backend.config import (
     get_bd_opportunity_path, get_bd_prospect_path,
     get_bd_company_path, get_bd_outreach_path,
+    get_bd_recommendation_path,
 )
 from backend.models.bd import BDDashboardStats
 from backend.services.bd_opportunity_store import list_opportunities
 from backend.services.bd_prospect_store import list_prospects
 from backend.services.bd_company_store import list_companies
 from backend.services.bd_outreach_store import list_drafts
+from backend.services.bd_recommendation_store import count_by_status
 
 router = APIRouter(prefix="/bd/dashboard", tags=["bd-dashboard"])
 
@@ -28,6 +30,7 @@ def get_bd_dashboard(
     prospect_path: str = Depends(get_bd_prospect_path),
     company_path: str = Depends(get_bd_company_path),
     outreach_path: str = Depends(get_bd_outreach_path),
+    recommendation_path: str = Depends(get_bd_recommendation_path),
 ):
     opportunities = list_opportunities(opp_path)
     prospects = list_prospects(prospect_path)
@@ -65,6 +68,19 @@ def get_bd_dashboard(
     if not actions:
         actions.append("Add companies and prospects to start scoring opportunities")
 
+    # Phase 11: Signal Intelligence counts
+    signal_recommendations = count_by_status(recommendation_path, "new")
+
+    companies_needing_research = sum(
+        1 for c in companies
+        if c.icp_match and (len(c.pain_points) == 0 or c.opportunity_score < 30)
+    )
+
+    prospects_ready_for_review = sum(
+        1 for p in prospects
+        if p.score_label in ("hot", "warm") and p.status not in ("engaged", "active")
+    )
+
     return BDDashboardStats(
         qualified_opportunities=len(qualified_opps),
         hot_opportunities=len(hot_opps),
@@ -74,4 +90,7 @@ def get_bd_dashboard(
         approved_drafts=len(approved),
         pipeline_snapshot=pipeline_snapshot,
         recommended_actions=actions,
+        signal_recommendations=signal_recommendations,
+        companies_needing_research=companies_needing_research,
+        prospects_ready_for_review=prospects_ready_for_review,
     )

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { BDSignal, SignalType } from '~/types'
+import type { BDSignal, BDSignalEvaluationResult } from '~/types'
 
 const api = useApi()
 
-const { data: signals, pending, error } = await useAsyncData<BDSignal[]>(
+const { data: signals, pending, error, refresh } = await useAsyncData<BDSignal[]>(
   'bd-signals',
   () => api.getBDSignals(),
   { default: () => [] }
@@ -52,8 +52,17 @@ const signalTypeConfig: Record<string, { label: string; color: string; icon: str
   },
 }
 
+const strengthConfig: Record<string, { label: string; color: string }> = {
+  critical: { label: 'Critical', color: 'bg-red-50 text-red-700 ring-red-200' },
+  high:     { label: 'High',     color: 'bg-orange-50 text-orange-700 ring-orange-200' },
+  medium:   { label: 'Medium',   color: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  low:      { label: 'Low',      color: 'bg-gray-100 text-gray-500 ring-gray-200' },
+}
+
 const activeType = ref<string>('all')
 const showReviewed = ref(true)
+const evaluating = ref<string | null>(null)
+const lastResult = ref<BDSignalEvaluationResult | null>(null)
 
 const typeFilters = [
   { value: 'all', label: 'All Types' },
@@ -71,13 +80,29 @@ const filtered = computed(() => {
   if (activeType.value !== 'all') list = list.filter(s => s.signal_type === activeType.value)
   return list
 })
+
+const evaluatedCount = computed(() => (signals.value ?? []).filter(s => s.evaluated).length)
+
+async function evaluateSignal(signal: BDSignal) {
+  evaluating.value = signal.id
+  lastResult.value = null
+  try {
+    const result = await api.evaluateBDSignal(signal.id)
+    lastResult.value = result
+    await refresh()
+  } catch {
+    // non-critical
+  } finally {
+    evaluating.value = null
+  }
+}
 </script>
 
 <template>
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
       title="Signals"
-      :subtitle="pending ? 'Loading…' : `${filtered.length} signals — market intelligence and trigger events`"
+      :subtitle="pending ? 'Loading…' : `${filtered.length} signals — ${evaluatedCount} evaluated`"
     >
       <template #actions>
         <button
@@ -96,6 +121,28 @@ const filtered = computed(() => {
       <!-- Error -->
       <div v-if="error" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
         Could not load signals — make sure the backend is running.
+      </div>
+
+      <!-- Last evaluation result toast -->
+      <div
+        v-if="lastResult"
+        class="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 flex items-start gap-3"
+      >
+        <svg class="h-4 w-4 text-violet-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+        </svg>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-violet-900">Signal evaluated — strength: {{ lastResult.signal_strength }}</p>
+          <p class="text-xs text-violet-700 mt-0.5 leading-snug">{{ lastResult.recommended_action }}</p>
+          <p v-if="lastResult.recommendation_created" class="text-xs text-violet-600 mt-1 font-medium">
+            Recommendation created for your review queue.
+          </p>
+        </div>
+        <button class="text-violet-400 hover:text-violet-600" @click="lastResult = null">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       <!-- Type filters -->
@@ -141,10 +188,31 @@ const filtered = computed(() => {
                   <div class="text-[10px] text-gray-400">relevance</div>
                 </div>
               </div>
-              <div class="flex items-center gap-3 mt-2">
+
+              <div class="flex items-center gap-3 mt-2 flex-wrap">
                 <span class="text-xs text-gray-400">{{ signal.source ?? 'Unknown source' }}</span>
                 <span class="text-xs text-gray-300">·</span>
                 <span class="text-xs text-gray-400">{{ signal.detected_at }}</span>
+
+                <!-- Evaluated badge -->
+                <template v-if="signal.evaluated">
+                  <span class="text-xs text-gray-300">·</span>
+                  <span class="inline-flex items-center gap-1 text-xs text-violet-600">
+                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                    </svg>
+                    Evaluated
+                  </span>
+                  <!-- Strength badge -->
+                  <span
+                    v-if="signal.signal_strength && signal.signal_strength !== 'medium'"
+                    class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset"
+                    :class="strengthConfig[signal.signal_strength]?.color ?? 'bg-gray-100 text-gray-500 ring-gray-200'"
+                  >
+                    {{ strengthConfig[signal.signal_strength]?.label ?? signal.signal_strength }}
+                  </span>
+                </template>
+
                 <span v-if="signal.reviewed" class="inline-flex items-center gap-1 text-xs text-emerald-600">
                   <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -153,6 +221,22 @@ const filtered = computed(() => {
                 </span>
               </div>
             </div>
+
+            <!-- Evaluate button -->
+            <button
+              class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
+              :class="signal.evaluated
+                ? 'border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100'
+                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+              :disabled="evaluating === signal.id"
+              @click="evaluateSignal(signal)"
+            >
+              <span v-if="evaluating === signal.id" class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              <svg v-else class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+              </svg>
+              {{ signal.evaluated ? 'Re-evaluate' : 'Evaluate' }}
+            </button>
           </div>
         </AppCard>
 

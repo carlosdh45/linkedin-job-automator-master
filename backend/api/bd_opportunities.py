@@ -1,15 +1,30 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.config import get_bd_opportunity_path, get_bd_activity_path
+from backend.config import (
+    get_bd_opportunity_path, get_bd_activity_path, get_bd_company_path,
+    get_bd_signal_path, get_bd_prospect_path, get_bd_pain_point_path,
+    get_bd_recommendation_path, get_bd_icp_config_path,
+)
 from backend.models.bd import (
     BDOpportunity, BDOpportunityCreate,
     BDMoveStageRequest, BDMoveStageResponse,
     OpportunityScoreRequest, OpportunityScoreResponse,
+    BDOpportunityRecalculateResult,
     _VALID_STAGES,
 )
-from backend.services.bd_opportunity_store import list_opportunities, create_opportunity, get_opportunity, update_opportunity
+from backend.services.bd_opportunity_store import (
+    list_opportunities, create_opportunity, get_opportunity, update_opportunity,
+)
+from backend.services.bd_company_store import get_company
+from backend.services.bd_signal_store import list_signals
+from backend.services.bd_prospect_store import list_prospects
+from backend.services.bd_pain_point_store import list_by_company
 from backend.services.bd_activity_store import log_activity
+from backend.services.bd_recommendation_store import create_recommendation
 from backend.services.bd_scoring import compute_opportunity_score
+from backend.services.bd_signal_intelligence import recalculate_opportunity as _recalculate
 
 router = APIRouter(prefix="/bd/opportunities", tags=["bd-opportunities"])
 
@@ -88,4 +103,94 @@ def move_stage(
         previous_stage=previous_stage,
         new_stage=req.stage,
         activity_id=activity.id,
+    )
+
+
+@router.post("/{opp_id}/recalculate", response_model=BDOpportunityRecalculateResult)
+def recalculate_opportunity_endpoint(
+    opp_id: str,
+    opp_path: str = Depends(get_bd_opportunity_path),
+    company_path: str = Depends(get_bd_company_path),
+    signal_path: str = Depends(get_bd_signal_path),
+    prospect_path: str = Depends(get_bd_prospect_path),
+    pain_point_path: str = Depends(get_bd_pain_point_path),
+    activity_path: str = Depends(get_bd_activity_path),
+    recommendation_path: str = Depends(get_bd_recommendation_path),
+):
+    """
+    Recalculate opportunity score from current local data.
+    No external API calls. Human review required before any action.
+    """
+    opp = get_opportunity(opp_path, opp_id)
+    if not opp:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+
+    company = get_company(company_path, opp.company_id)
+    signals = list_signals(signal_path)
+    prospects = list_prospects(prospect_path)
+    pain_points = list_by_company(pain_point_path, opp.company_id)
+
+    result = _recalculate(opp, company, signals, prospects, pain_points)
+
+    update_opportunity(opp_path, opp_id, {
+        "score": result["new_score"],
+        "score_label": result["new_score_label"],
+        "score_change": result["score_change"],
+        "score_reason": result["score_reason"],
+        "signal_contribution": result["signal_contribution"],
+        "last_recalculated_at": datetime.utcnow().isoformat(),
+        "recommended_action": (
+            f"Schedule outreach to {opp.company_name}"
+            if result["new_score"] >= 75
+            else f"Prepare outreach draft for {opp.company_name}"
+            if result["new_score"] >= 55
+            else None
+        ),
+    })
+
+    recommendation_created = False
+    if result["new_score"] >= 55:
+        priority = "high" if result["new_score"] >= 75 else "medium"
+        create_recommendation(recommendation_path, {
+            "entity_type": "opportunity",
+            "entity_id": opp_id,
+            "entity_name": opp.company_name,
+            "priority": priority,
+            "reason": f"Score {result['new_score']} ({result['new_score_label']}): {result['score_reason']}",
+            "recommended_action": (
+                f"Schedule outreach to {opp.company_name}"
+                if result["new_score"] >= 75
+                else f"Prepare outreach draft for {opp.company_name}"
+            ),
+            "confidence_score": min(100, result["new_score"]),
+        })
+        recommendation_created = True
+
+    change_str = f"{result['score_change']:+d}" if result["score_change"] is not None else "n/a"
+    log_activity(activity_path, {
+        "entity_type": "opportunity",
+        "entity_id": opp_id,
+        "action": "opportunity_recalculated",
+        "description": (
+            f"{opp.company_name} score updated: {result['previous_score']} → "
+            f"{result['new_score']} ({change_str})"
+        ),
+        "metadata": {
+            "previous_score": result["previous_score"],
+            "new_score": result["new_score"],
+            "score_change": result["score_change"],
+            "signal_contribution": result["signal_contribution"],
+        },
+    })
+
+    return BDOpportunityRecalculateResult(
+        opportunity_id=opp_id,
+        previous_score=result["previous_score"],
+        new_score=result["new_score"],
+        score_change=result["score_change"],
+        new_score_label=result["new_score_label"],
+        signal_contribution=result["signal_contribution"],
+        score_reason=result["score_reason"],
+        breakdown=result["breakdown"],
+        recommendation_created=recommendation_created,
     )

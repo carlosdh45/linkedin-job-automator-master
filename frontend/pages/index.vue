@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { statJobTotal, statJobScored, statLeadTotal, statLeadScored } from '~/types'
-import type { BDCompany } from '~/types'
+import type { BDCompany, BDRecommendation } from '~/types'
 
 const api = useApi()
 const showSeedConfirm = ref(false)
+const refreshingRecs = ref(false)
+const dismissing = ref<string | null>(null)
 
 const { data: brief, pending, error, refresh } = await useAsyncData('dashboard', () => api.getDailyBrief())
 const { data: bdStats, refresh: refreshBD } = await useAsyncData('bd-dashboard', () => api.getBDDashboard(), {
@@ -12,6 +14,11 @@ const { data: bdStats, refresh: refreshBD } = await useAsyncData('bd-dashboard',
 const { data: bdCompanies } = await useAsyncData<BDCompany[]>('bd-companies-dash', () => api.getBDCompanies(), {
   default: () => [],
 })
+const { data: recommendations, refresh: refreshRecs } = await useAsyncData<BDRecommendation[]>(
+  'bd-recommendations-dash',
+  () => api.getBDRecommendations({ status: 'new', limit: 10 }),
+  { default: () => [] }
+)
 
 const today = computed(() =>
   brief.value?.date
@@ -70,6 +77,17 @@ const stageLabel: Record<string, string> = {
   lost: 'Lost',
 }
 
+const priorityConfig: Record<string, { label: string; color: string }> = {
+  critical: { label: 'Critical', color: 'bg-red-50 text-red-700 ring-red-200' },
+  high:     { label: 'High',     color: 'bg-orange-50 text-orange-700 ring-orange-200' },
+  medium:   { label: 'Medium',   color: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  low:      { label: 'Low',      color: 'bg-gray-100 text-gray-500 ring-gray-200' },
+}
+
+const topRecommendations = computed(() =>
+  (recommendations.value ?? []).filter(r => r.status === 'new').slice(0, 5)
+)
+
 async function seedDemo() {
   try {
     await api.seedDemo()
@@ -77,6 +95,30 @@ async function seedDemo() {
     await refreshBD()
   } catch {
     // non-critical
+  }
+}
+
+async function runRefresh() {
+  refreshingRecs.value = true
+  try {
+    await api.refreshBDRecommendations()
+    await Promise.all([refreshBD(), refreshRecs()])
+  } catch {
+    // non-critical
+  } finally {
+    refreshingRecs.value = false
+  }
+}
+
+async function dismissRec(id: string) {
+  dismissing.value = id
+  try {
+    await api.dismissBDRecommendation(id)
+    await refreshRecs()
+  } catch {
+    // non-critical
+  } finally {
+    dismissing.value = null
   }
 }
 </script>
@@ -372,6 +414,81 @@ async function seedDemo() {
                 <p v-else class="text-sm text-gray-400">No active pipeline deals yet.</p>
                 <p class="text-xs text-gray-400 pt-1 border-t border-gray-100">
                   Move opportunities through stages on the <NuxtLink to="/pipeline" class="text-blue-600 hover:underline">Pipeline page</NuxtLink>
+                </p>
+              </div>
+            </AppCard>
+
+            <!-- Signal Intelligence Recommendations -->
+            <AppCard>
+              <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h2 class="text-sm font-semibold text-gray-900">Signal Intelligence</h2>
+                  <p class="text-xs text-gray-400 mt-0.5">Rule-based recommendations for your review</p>
+                </div>
+                <button
+                  class="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  :disabled="refreshingRecs"
+                  @click="runRefresh"
+                >
+                  <span v-if="refreshingRecs" class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  <svg v-else class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                  Refresh
+                </button>
+              </div>
+
+              <!-- Intelligence summary counts -->
+              <div v-if="bdStats" class="px-5 py-3 border-b border-gray-50 flex gap-4">
+                <div class="text-center">
+                  <p class="text-lg font-bold text-violet-600 tabular-nums">{{ bdStats.signal_recommendations }}</p>
+                  <p class="text-[10px] text-gray-400">new recs</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-lg font-bold text-amber-600 tabular-nums">{{ bdStats.companies_needing_research }}</p>
+                  <p class="text-[10px] text-gray-400">need research</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-lg font-bold text-emerald-600 tabular-nums">{{ bdStats.prospects_ready_for_review }}</p>
+                  <p class="text-[10px] text-gray-400">ready for review</p>
+                </div>
+              </div>
+
+              <div class="px-5 py-4 space-y-3">
+                <template v-if="topRecommendations.length">
+                  <div
+                    v-for="rec in topRecommendations"
+                    :key="rec.id"
+                    class="flex items-start gap-2.5 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5"
+                  >
+                    <span
+                      class="mt-0.5 inline-flex flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset"
+                      :class="priorityConfig[rec.priority]?.color ?? 'bg-gray-100 text-gray-500 ring-gray-200'"
+                    >
+                      {{ priorityConfig[rec.priority]?.label ?? rec.priority }}
+                    </span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-xs font-medium text-gray-900 truncate">{{ rec.entity_name }}</p>
+                      <p class="text-[11px] text-gray-500 leading-snug mt-0.5">{{ rec.recommended_action }}</p>
+                    </div>
+                    <button
+                      class="flex-shrink-0 text-gray-300 hover:text-gray-500 transition-colors"
+                      :disabled="dismissing === rec.id"
+                      @click="dismissRec(rec.id)"
+                    >
+                      <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </template>
+                <p v-else class="text-sm text-gray-400">
+                  No new recommendations.
+                  <button class="text-blue-600 hover:underline ml-1" @click="runRefresh">Run refresh</button>
+                  to evaluate signals and opportunities.
+                </p>
+                <p class="text-[11px] text-gray-400 border-t border-gray-100 pt-2">
+                  All recommendations require manual action — DobryBot never sends automatically.
                 </p>
               </div>
             </AppCard>

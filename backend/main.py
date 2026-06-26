@@ -32,6 +32,7 @@ from backend.api import (
     bd_activity,
     bd_icp,
     bd_dashboard,
+    bd_recommendations,
 )
 
 logger = logging.getLogger(__name__)
@@ -87,3 +88,4 @@ app.include_router(bd_outreach_drafts.router, prefix="/api")
 app.include_router(bd_activity.router, prefix="/api")
 app.include_router(bd_icp.router, prefix="/api")
 app.include_router(bd_dashboard.router, prefix="/api")
+app.include_router(bd_recommendations.router, prefix="/api")

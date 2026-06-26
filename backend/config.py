@@ -82,3 +82,7 @@ def get_bd_activity_path() -> str:
 
 def get_bd_icp_config_path() -> str:
     return os.environ.get("DOBRYBOT_BD_ICP_CONFIG_PATH", "data/bd_icp_config.json")
+
+
+def get_bd_recommendation_path() -> str:
+    return os.environ.get("DOBRYBOT_BD_RECOMMENDATION_PATH", "data/bd_recommendations.json")

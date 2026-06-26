@@ -119,6 +119,10 @@ class BDSignal(BaseModel):
     reviewed: bool = False
     review_action: Optional[str] = None
     created_at: str = Field(default_factory=_now)
+    # Phase 11: Signal Intelligence
+    evaluated: bool = False
+    evaluated_at: Optional[str] = None
+    signal_strength: str = "medium"  # low | medium | high | critical
 
 
 class BDSignalCreate(BaseModel):
@@ -173,6 +177,11 @@ class BDOpportunity(BaseModel):
     notes: str = ""
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
+    # Phase 11: Recalculation tracking
+    last_recalculated_at: Optional[str] = None
+    score_change: Optional[int] = None
+    score_reason: Optional[str] = None
+    signal_contribution: int = 0
 
 
 class BDOpportunityCreate(BaseModel):
@@ -389,6 +398,10 @@ class BDDashboardStats(BaseModel):
     approved_drafts: int = 0
     pipeline_snapshot: List[dict] = Field(default_factory=list)
     recommended_actions: List[str] = Field(default_factory=list)
+    # Phase 11: Signal Intelligence
+    signal_recommendations: int = 0
+    companies_needing_research: int = 0
+    prospects_ready_for_review: int = 0
 
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
@@ -416,3 +429,68 @@ class BDPipelineStage(BaseModel):
 class BDPipelineResponse(BaseModel):
     stages: List[BDPipelineStage]
     total_active: int
+
+
+# ── Phase 11: Signal Intelligence Recommendations ─────────────────────────────
+
+class BDRecommendation(BaseModel):
+    id: str = Field(default_factory=_uid)
+    entity_type: str          # "signal" | "company" | "opportunity" | "prospect"
+    entity_id: str
+    entity_name: str
+    priority: str             # "critical" | "high" | "medium" | "low"
+    reason: str
+    recommended_action: str
+    confidence_score: int = 50
+    status: str = "new"       # "new" | "reviewed" | "dismissed" | "actioned"
+    created_at: str = Field(default_factory=_now)
+    updated_at: str = Field(default_factory=_now)
+
+
+class BDRecommendationCreate(BaseModel):
+    entity_type: str
+    entity_id: str
+    entity_name: str
+    priority: str
+    reason: str
+    recommended_action: str
+    confidence_score: int = 50
+
+
+class BDSignalEvaluationResult(BaseModel):
+    signal_id: str
+    signal_strength: str
+    priority: str
+    confidence_score: int
+    reason: str
+    recommended_action: str
+    recommendation_created: bool
+
+
+class BDCompanyEvaluationResult(BaseModel):
+    company_id: str
+    recommendations_created: int
+    score_updated: bool
+    new_score: int
+    new_score_label: str
+    flags: List[str]
+
+
+class BDOpportunityRecalculateResult(BaseModel):
+    opportunity_id: str
+    previous_score: int
+    new_score: int
+    score_change: int
+    new_score_label: str
+    signal_contribution: int
+    score_reason: str
+    breakdown: dict
+    recommendation_created: bool
+
+
+class BDRecommendationRefreshResult(BaseModel):
+    signals_evaluated: int
+    companies_evaluated: int
+    opportunities_recalculated: int
+    recommendations_created: int
+    safety_notice: str

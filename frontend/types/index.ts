@@ -280,6 +280,10 @@ export interface BDSignal {
   reviewed: boolean
   review_action: string | null
   created_at: string
+  // Phase 11
+  evaluated: boolean
+  evaluated_at: string | null
+  signal_strength: string
 }
 
 export interface BDPainPoint {
@@ -309,6 +313,11 @@ export interface BDOpportunity {
   notes: string
   created_at: string
   updated_at: string
+  // Phase 11
+  last_recalculated_at: string | null
+  score_change: number | null
+  score_reason: string | null
+  signal_contribution: number
 }
 
 export interface BDDealPacket {
@@ -406,6 +415,10 @@ export interface BDDashboardStats {
   approved_drafts: number
   pipeline_snapshot: Array<{ stage: string; count: number }>
   recommended_actions: string[]
+  // Phase 11: Signal Intelligence
+  signal_recommendations: number
+  companies_needing_research: number
+  prospects_ready_for_review: number
 }
 
 export interface BDMoveStageResponse {
@@ -413,6 +426,64 @@ export interface BDMoveStageResponse {
   previous_stage: string
   new_stage: string
   activity_id: string
+}
+
+// ── Phase 11: Signal Intelligence ─────────────────────────────────────────────
+
+export type RecommendationStatus = 'new' | 'reviewed' | 'dismissed' | 'actioned'
+export type RecommendationPriority = 'critical' | 'high' | 'medium' | 'low'
+
+export interface BDRecommendation {
+  id: string
+  entity_type: string
+  entity_id: string
+  entity_name: string
+  priority: RecommendationPriority
+  reason: string
+  recommended_action: string
+  confidence_score: number
+  status: RecommendationStatus
+  created_at: string
+  updated_at: string
+}
+
+export interface BDSignalEvaluationResult {
+  signal_id: string
+  signal_strength: string
+  priority: RecommendationPriority
+  confidence_score: number
+  reason: string
+  recommended_action: string
+  recommendation_created: boolean
+}
+
+export interface BDCompanyEvaluationResult {
+  company_id: string
+  recommendations_created: number
+  score_updated: boolean
+  new_score: number
+  new_score_label: string
+  flags: string[]
+}
+
+export interface BDOpportunityRecalculateResult {
+  opportunity_id: string
+  previous_score: number
+  new_score: number
+  score_change: number
+  new_score_label: string
+  signal_contribution: number
+  score_reason: string
+  breakdown: Record<string, number>
+  recommendation_created: boolean
+}
+
+export interface BDRecommendationRefreshResult {
+  signals_evaluated: number
+  companies_evaluated: number
+  opportunities_recalculated: number
+  recommendations_created: number
+  safety_notice: string
 }
 
 export interface BDPipelineDeal {
