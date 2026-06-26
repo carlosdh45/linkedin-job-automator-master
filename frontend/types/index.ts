@@ -221,6 +221,145 @@ export interface ApplicationPacket {
 
 export type ApplicationPacketUpdate = Partial<Omit<ApplicationPacket, 'updated_at'>>
 
+// ── BD OS Types ───────────────────────────────────────────────────────────────
+
+export type ProspectStatus = 'identified' | 'researched' | 'engaged' | 'active' | 'closed'
+export type CompanyStatus = 'identified' | 'researched' | 'qualified' | 'engaged' | 'active' | 'closed'
+export type SignalType = 'hiring' | 'funding' | 'leadership_change' | 'tech_change' | 'competitive' | 'pain_point' | 'growth' | 'other'
+export type OpportunityStage = 'identified' | 'researched' | 'qualified' | 'engaged' | 'deal_packet' | 'active' | 'won' | 'lost'
+export type DealPacketStatus = 'draft' | 'review' | 'approved' | 'executed'
+export type MessageType = 'email' | 'linkedin' | 'intro_request'
+export type ScoreLabel = 'hot' | 'warm' | 'cold' | 'disqualified'
+
+export interface BDCompany {
+  id: string
+  name: string
+  domain: string | null
+  industry: string | null
+  size_estimate: string | null
+  tech_signals: string[]
+  pain_points: string[]
+  opportunity_score: number
+  score_label: ScoreLabel
+  icp_match: boolean
+  status: CompanyStatus
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export interface BDProspect {
+  id: string
+  company_id: string
+  company_name: string
+  name: string
+  title: string | null
+  seniority: string | null
+  linkedin_url: string | null
+  pain_point_count: number
+  signal_count: number
+  opportunity_score: number
+  score_label: ScoreLabel
+  recommended_angle: string | null
+  status: ProspectStatus
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export interface BDSignal {
+  id: string
+  company_id: string | null
+  company_name: string
+  prospect_id: string | null
+  signal_type: SignalType
+  summary: string
+  source: string | null
+  relevance_score: number
+  detected_at: string
+  reviewed: boolean
+  review_action: string | null
+  created_at: string
+}
+
+export interface BDPainPoint {
+  id: string
+  company_id: string
+  company_name: string
+  description: string
+  category: string | null
+  signal_source: string | null
+  confidence: number
+  recommended_angle: string | null
+  created_at: string
+}
+
+export interface BDOpportunity {
+  id: string
+  company_id: string
+  company_name: string
+  contact_name: string | null
+  score: number
+  score_label: ScoreLabel
+  stage: OpportunityStage
+  pain_points: string[]
+  value_proposition: string | null
+  recommended_action: string | null
+  deal_packet_id: string | null
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export interface BDDealPacket {
+  id: string
+  company_name: string
+  contact_name: string | null
+  contact_role: string | null
+  engagement_type: string | null
+  company_summary: string
+  pain_points: string[]
+  value_proposition: string
+  talking_points: string[]
+  outreach_draft: string
+  checklist: ChecklistItem[]
+  status: DealPacketStatus
+  notes: string
+  created_at: string
+  updated_at: string | null
+}
+
+export interface BDOutreachDraft {
+  id: string
+  company_name: string
+  contact_name: string
+  contact_role: string
+  message_type: MessageType
+  subject: string | null
+  body: string
+  tone: string
+  angle: string | null
+  personalization_score: number
+  spam_risk_score: number
+  ai_sounding_score: number
+  quality_status: string
+  status: string
+  created_at: string
+}
+
+export interface BDPipelineStage {
+  slug: string
+  label: string
+  order: number
+  color: string
+  count: number
+}
+
+export interface BDPipelineSnapshot {
+  stages: BDPipelineStage[]
+  total_active: number
+}
+
 // ── Resume Editor — Phase 6 ───────────────────────────────────────────────────
 
 export type ResumeTone = 'professional' | 'executive' | 'technical' | 'concise'
