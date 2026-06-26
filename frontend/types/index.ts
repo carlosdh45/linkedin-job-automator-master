@@ -347,18 +347,32 @@ export interface BDOutreachDraft {
   created_at: string
 }
 
+export interface BDPipelineDeal {
+  id: string
+  company: string
+  contact: string | null
+  score: number
+  score_label: string
+  stage: string
+  last_action: string
+  pain_points: string[]
+}
+
 export interface BDPipelineStage {
   slug: string
   label: string
   order: number
   color: string
   count: number
+  deals: BDPipelineDeal[]
 }
 
 export interface BDPipelineSnapshot {
   stages: BDPipelineStage[]
   total_active: number
 }
+
+export type BDPipelineResponse = BDPipelineSnapshot
 
 // ── Resume Editor — Phase 6 ───────────────────────────────────────────────────
 

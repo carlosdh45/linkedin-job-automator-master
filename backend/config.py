@@ -44,3 +44,33 @@ def get_import_preview_path() -> str:
 
 def get_application_packet_path() -> str:
     return os.environ.get("DOBRYBOT_APPLICATION_PACKET_PATH", "data/application_packet.json")
+
+
+# ── BD OS store paths ─────────────────────────────────────────────────────────
+
+def get_bd_company_path() -> str:
+    return os.environ.get("DOBRYBOT_BD_COMPANY_PATH", "data/bd_companies.json")
+
+
+def get_bd_prospect_path() -> str:
+    return os.environ.get("DOBRYBOT_BD_PROSPECT_PATH", "data/bd_prospects.json")
+
+
+def get_bd_signal_path() -> str:
+    return os.environ.get("DOBRYBOT_BD_SIGNAL_PATH", "data/bd_signals.json")
+
+
+def get_bd_pain_point_path() -> str:
+    return os.environ.get("DOBRYBOT_BD_PAIN_POINT_PATH", "data/bd_pain_points.json")
+
+
+def get_bd_opportunity_path() -> str:
+    return os.environ.get("DOBRYBOT_BD_OPPORTUNITY_PATH", "data/bd_opportunities.json")
+
+
+def get_bd_deal_packet_path() -> str:
+    return os.environ.get("DOBRYBOT_BD_DEAL_PACKET_PATH", "data/bd_deal_packets.json")
+
+
+def get_bd_outreach_path() -> str:
+    return os.environ.get("DOBRYBOT_BD_OUTREACH_PATH", "data/bd_outreach_drafts.json")

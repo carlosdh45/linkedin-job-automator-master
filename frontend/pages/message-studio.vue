@@ -1,25 +1,32 @@
 <script setup lang="ts">
+import type { BDOutreachDraft } from '~/types'
+
 type MessageType = 'email' | 'linkedin' | 'intro_request'
 type ToneType = 'warm' | 'direct' | 'executive' | 'technical'
 
-interface DraftContext {
-  company: string
-  contact: string
-  role: string
-  painPoint: string
-  angle: string
-}
+const api = useApi()
 
 const activeTab = ref<'compose' | 'drafts'>('compose')
 const selectedType = ref<MessageType>('email')
 const selectedTone = ref<ToneType>('warm')
-const draftContext = ref<DraftContext>({
+const isGenerating = ref(false)
+const generatedDraft = ref<string | null>(null)
+const generatedSubject = ref<string | null>(null)
+const generateError = ref<string | null>(null)
+
+const draftContext = ref({
   company: 'Meridian Labs',
   contact: 'Alex Rivera',
   role: 'VP of Engineering',
   painPoint: 'Manual deployment pipeline slowing release velocity',
   angle: 'CI/CD automation and engineering efficiency',
 })
+
+const { data: savedDrafts, pending: draftsPending } = await useAsyncData<BDOutreachDraft[]>(
+  'bd-outreach-drafts',
+  () => api.getBDSignals().then(() => [] as BDOutreachDraft[]),
+  { default: () => [] }
+)
 
 const messageTypes: { value: MessageType; label: string }[] = [
   { value: 'email', label: 'Email' },
@@ -34,44 +41,29 @@ const tones: { value: ToneType; label: string; description: string }[] = [
   { value: 'technical', label: 'Technical', description: 'Peer-to-peer, credibility-led' },
 ]
 
-const mockDraft = computed(() => {
-  const { company, contact, painPoint, angle } = draftContext.value
-  if (selectedType.value === 'email') {
-    return `Subject: Solving the ${painPoint.toLowerCase()} at ${company}
+const displayDraft = computed(() => generatedDraft.value ?? '')
 
-Hi ${contact.split(' ')[0]},
-
-I came across ${company}'s engineering blog and noticed you're working through some challenges with ${painPoint.toLowerCase()}.
-
-At CorosDev, we've helped teams like yours reduce deployment cycle time by 60–80% without disrupting existing workflows — typically in 6–8 weeks.
-
-Would a 20-minute call to share what's working for similar teams be worth your time?
-
-Best,
-[Your name]`
+async function generateDraft() {
+  generateError.value = null
+  isGenerating.value = true
+  try {
+    const result = await api.generateBDDraft({
+      company_name: draftContext.value.company,
+      contact_name: draftContext.value.contact,
+      contact_role: draftContext.value.role,
+      pain_point: draftContext.value.painPoint,
+      angle: draftContext.value.angle,
+      message_type: selectedType.value,
+      tone: selectedTone.value,
+    })
+    generatedDraft.value = result.draft
+    generatedSubject.value = result.subject ?? null
+  } catch {
+    generateError.value = 'Could not generate draft — make sure the backend is running.'
+  } finally {
+    isGenerating.value = false
   }
-  if (selectedType.value === 'linkedin') {
-    return `Hi ${contact.split(' ')[0]}, I saw your team is scaling fast at ${company} — impressive growth. We've been helping engineering orgs tackle ${painPoint.toLowerCase()} and I thought there might be a relevant angle for your roadmap. Would love to share what we've seen work. Open to a quick chat?`
-  }
-  return `Hi [Mutual connection],
-
-Could you introduce me to ${contact} at ${company}? I've been following their engineering work and think there's a strong alignment around ${angle}. I'm not looking to pitch — just a conversation to see if it makes sense to explore further.
-
-Happy to make it easy for you with a quick intro draft if helpful.
-
-Thanks!`
-})
-
-const mockSavedDrafts = [
-  {
-    id: '1', company: 'Vantage Capital', contact: 'Morgan Chen',
-    type: 'email', status: 'review', score: 84, updatedAt: '2026-06-24',
-  },
-  {
-    id: '2', company: 'Meridian Labs', contact: 'Alex Rivera',
-    type: 'linkedin', status: 'draft', score: 71, updatedAt: '2026-06-22',
-  },
-]
+}
 
 const statusColor: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -89,9 +81,6 @@ const statusColor: Record<string, string> = {
       <template #actions>
         <span class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-700">
           Drafts only — never auto-sends
-        </span>
-        <span class="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700">
-          Placeholder UI
         </span>
       </template>
     </PageHeader>
@@ -163,44 +152,32 @@ const statusColor: Record<string, string> = {
                 <!-- Context fields -->
                 <div>
                   <label class="block text-xs font-semibold text-gray-700 mb-1">Company</label>
-                  <input
-                    v-model="draftContext.company"
-                    type="text"
-                    class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                  />
+                  <input v-model="draftContext.company" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400" />
                 </div>
                 <div>
                   <label class="block text-xs font-semibold text-gray-700 mb-1">Contact Name</label>
-                  <input
-                    v-model="draftContext.contact"
-                    type="text"
-                    class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                  />
+                  <input v-model="draftContext.contact" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400" />
                 </div>
                 <div>
                   <label class="block text-xs font-semibold text-gray-700 mb-1">Pain Point</label>
-                  <textarea
-                    v-model="draftContext.painPoint"
-                    rows="2"
-                    class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none"
-                  />
+                  <textarea v-model="draftContext.painPoint" rows="2" class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none" />
                 </div>
                 <div>
                   <label class="block text-xs font-semibold text-gray-700 mb-1">Angle / Value Prop</label>
-                  <textarea
-                    v-model="draftContext.angle"
-                    rows="2"
-                    class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none"
-                  />
+                  <textarea v-model="draftContext.angle" rows="2" class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none" />
                 </div>
 
                 <button
-                  class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
-                  disabled
-                  title="Draft generation connects in Phase 2"
+                  class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  :disabled="isGenerating || !draftContext.company || !draftContext.contact"
+                  @click="generateDraft"
                 >
-                  Generate Draft — Phase 2
+                  {{ isGenerating ? 'Generating…' : 'Generate Draft' }}
                 </button>
+
+                <div v-if="generateError" class="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+                  {{ generateError }}
+                </div>
               </div>
             </AppCard>
           </div>
@@ -208,47 +185,32 @@ const statusColor: Record<string, string> = {
           <!-- Right: draft preview (3/5) -->
           <div class="xl:col-span-3 space-y-4">
             <AppCard>
-              <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h2 class="text-sm font-semibold text-gray-900">Draft Preview</h2>
-                  <p class="text-xs text-gray-400 mt-0.5">Sample draft — AI generation connects in Phase 2</p>
-                </div>
-                <button
-                  class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  disabled
-                  title="Send to Review Queue connects in Phase 2"
-                >
-                  Send to Review Queue
-                </button>
+              <div class="px-5 py-3.5 border-b border-gray-100">
+                <h2 class="text-sm font-semibold text-gray-900">Draft Preview</h2>
+                <p class="text-xs text-gray-400 mt-0.5">Rule-based local template — no AI, no external calls</p>
               </div>
-              <div class="px-5 py-4">
-                <pre class="whitespace-pre-wrap font-sans text-sm text-gray-700 leading-relaxed">{{ mockDraft }}</pre>
+
+              <div v-if="!displayDraft" class="px-5 py-12 text-center text-sm text-gray-400">
+                Fill in context and click "Generate Draft" to create a local template draft.
+              </div>
+              <div v-else class="px-5 py-4">
+                <div v-if="generatedSubject" class="mb-3 text-xs font-medium text-gray-500 border-b border-gray-100 pb-2">
+                  {{ generatedSubject }}
+                </div>
+                <pre class="whitespace-pre-wrap font-sans text-sm text-gray-700 leading-relaxed">{{ displayDraft }}</pre>
               </div>
             </AppCard>
 
-            <!-- Quality indicators (placeholder) -->
-            <AppCard>
-              <div class="px-5 py-3.5 border-b border-gray-100">
-                <h2 class="text-sm font-semibold text-gray-900">Quality Indicators</h2>
+            <!-- Safety notice -->
+            <div class="flex items-start gap-3 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
+              <svg class="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+              </svg>
+              <div>
+                <p class="text-sm font-medium text-emerald-800">Human-in-the-loop — always</p>
+                <p class="text-xs text-emerald-700 mt-0.5">Drafts are generated locally using rule-based templates. No AI calls. No external APIs. DobryBot does not send or post anything automatically. All outreach requires your explicit approval.</p>
               </div>
-              <div class="px-5 py-4 grid grid-cols-3 gap-4">
-                <div class="text-center">
-                  <div class="text-2xl font-bold text-emerald-600">—</div>
-                  <div class="text-xs text-gray-500 mt-0.5">Personalization</div>
-                </div>
-                <div class="text-center">
-                  <div class="text-2xl font-bold text-emerald-600">—</div>
-                  <div class="text-xs text-gray-500 mt-0.5">Spam Risk</div>
-                </div>
-                <div class="text-center">
-                  <div class="text-2xl font-bold text-emerald-600">—</div>
-                  <div class="text-xs text-gray-500 mt-0.5">AI Detection</div>
-                </div>
-              </div>
-              <div class="px-5 pb-4 text-xs text-gray-400 text-center">
-                Quality scoring activates when draft generation is connected in Phase 2
-              </div>
-            </AppCard>
+            </div>
           </div>
         </div>
       </template>
@@ -256,37 +218,8 @@ const statusColor: Record<string, string> = {
       <!-- Saved drafts tab -->
       <template v-else>
         <AppCard>
-          <div class="overflow-x-auto">
-            <table class="app-table">
-              <thead>
-                <tr>
-                  <th>Company / Contact</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th class="text-right">Score</th>
-                  <th>Updated</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="d in mockSavedDrafts" :key="d.id">
-                  <td>
-                    <div class="font-medium text-gray-900">{{ d.company }}</div>
-                    <div class="text-xs text-gray-400">{{ d.contact }}</div>
-                  </td>
-                  <td class="text-gray-500 capitalize">{{ d.type.replace('_', ' ') }}</td>
-                  <td>
-                    <span
-                      class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                      :class="statusColor[d.status] ?? 'bg-gray-100 text-gray-600'"
-                    >
-                      {{ d.status }}
-                    </span>
-                  </td>
-                  <td class="text-right font-semibold tabular-nums text-violet-600">{{ d.score }}</td>
-                  <td class="text-gray-500">{{ d.updatedAt }}</td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="px-5 py-4 text-center text-sm text-gray-400">
+            Saved draft tracking connects in Phase 10 when outreach drafts are persisted through the Review Queue.
           </div>
         </AppCard>
       </template>

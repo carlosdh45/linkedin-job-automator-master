@@ -1,51 +1,15 @@
 <script setup lang="ts">
-type SignalType = 'hiring' | 'funding' | 'leadership_change' | 'tech_change' | 'competitive' | 'pain_point' | 'growth'
+import type { BDSignal, SignalType } from '~/types'
 
-interface MockSignal {
-  id: string
-  company: string
-  type: SignalType
-  summary: string
-  source: string
-  relevance: number
-  detectedAt: string
-  reviewed: boolean
-}
+const api = useApi()
 
-const mockSignals: MockSignal[] = [
-  {
-    id: '1', company: 'Meridian Labs', type: 'hiring',
-    summary: 'Posting 3 senior DevOps / platform engineering roles — signals scaling initiative or infrastructure pain',
-    source: 'Job board', relevance: 92, detectedAt: '2026-06-24', reviewed: false,
-  },
-  {
-    id: '2', company: 'Vantage Capital', type: 'leadership_change',
-    summary: 'New CTO appointed 6 weeks ago — incoming technical leadership often re-evaluates vendor relationships',
-    source: 'LinkedIn', relevance: 88, detectedAt: '2026-06-20', reviewed: true,
-  },
-  {
-    id: '3', company: 'Vantage Capital', type: 'pain_point',
-    summary: 'Job description for Compliance Engineer mentions "manual reporting burden" and "spreadsheet-heavy workflows"',
-    source: 'Job board', relevance: 85, detectedAt: '2026-06-22', reviewed: false,
-  },
-  {
-    id: '4', company: 'Stratos Engineering', type: 'tech_change',
-    summary: 'Engineering blog post references migrating from Jenkins to GitHub Actions — potential toolchain transition support need',
-    source: 'Blog', relevance: 71, detectedAt: '2026-06-18', reviewed: false,
-  },
-  {
-    id: '5', company: 'Nexus Health', type: 'growth',
-    summary: 'Headcount grew 40% YoY per LinkedIn — signals scaling challenges and possible new budget for infrastructure',
-    source: 'LinkedIn', relevance: 68, detectedAt: '2026-06-15', reviewed: true,
-  },
-  {
-    id: '6', company: 'Prism Analytics', type: 'competitive',
-    summary: 'Competitor Lumos Analytics raised Series B — Prism may be under pressure to accelerate product velocity',
-    source: 'TechCrunch', relevance: 55, detectedAt: '2026-06-10', reviewed: false,
-  },
-]
+const { data: signals, pending, error } = await useAsyncData<BDSignal[]>(
+  'bd-signals',
+  () => api.getBDSignals(),
+  { default: () => [] }
+)
 
-const signalTypeConfig: Record<SignalType, { label: string; color: string; icon: string }> = {
+const signalTypeConfig: Record<string, { label: string; color: string; icon: string }> = {
   hiring: {
     label: 'Hiring Signal',
     color: 'bg-blue-50 text-blue-700 ring-blue-100',
@@ -81,6 +45,11 @@ const signalTypeConfig: Record<SignalType, { label: string; color: string; icon:
     color: 'bg-teal-50 text-teal-700 ring-teal-100',
     icon: 'M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941',
   },
+  other: {
+    label: 'Signal',
+    color: 'bg-gray-100 text-gray-600 ring-gray-200',
+    icon: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z',
+  },
 }
 
 const activeType = ref<string>('all')
@@ -97,9 +66,9 @@ const typeFilters = [
 ]
 
 const filtered = computed(() => {
-  let list = mockSignals
+  let list = signals.value ?? []
   if (!showReviewed.value) list = list.filter(s => !s.reviewed)
-  if (activeType.value !== 'all') list = list.filter(s => s.type === activeType.value)
+  if (activeType.value !== 'all') list = list.filter(s => s.signal_type === activeType.value)
   return list
 })
 </script>
@@ -108,7 +77,7 @@ const filtered = computed(() => {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
       title="Signals"
-      :subtitle="`${filtered.length} signals — market intelligence and trigger events`"
+      :subtitle="pending ? 'Loading…' : `${filtered.length} signals — market intelligence and trigger events`"
     >
       <template #actions>
         <button
@@ -120,13 +89,15 @@ const filtered = computed(() => {
         >
           {{ showReviewed ? 'Show unreviewed only' : 'Show all' }}
         </button>
-        <span class="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700">
-          Placeholder data
-        </span>
       </template>
     </PageHeader>
 
     <div class="flex-1 p-6 space-y-4 max-w-5xl w-full mx-auto">
+      <!-- Error -->
+      <div v-if="error" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        Could not load signals — make sure the backend is running.
+      </div>
+
       <!-- Type filters -->
       <div class="flex gap-1.5 flex-wrap">
         <button
@@ -142,37 +113,38 @@ const filtered = computed(() => {
         </button>
       </div>
 
+      <!-- Loading -->
+      <div v-if="pending" class="py-12 text-center text-sm text-gray-400 animate-pulse">Loading signals…</div>
+
       <!-- Signal cards -->
-      <div class="space-y-3">
+      <div v-else class="space-y-3">
         <AppCard
           v-for="signal in filtered"
           :key="signal.id"
         >
           <div class="px-5 py-4 flex items-start gap-4">
-            <!-- Signal type badge -->
             <span
               class="mt-0.5 inline-flex flex-shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ring-1 ring-inset"
-              :class="signalTypeConfig[signal.type]?.color ?? 'bg-gray-100 text-gray-600 ring-gray-200'"
+              :class="signalTypeConfig[signal.signal_type]?.color ?? 'bg-gray-100 text-gray-600 ring-gray-200'"
             >
-              {{ signalTypeConfig[signal.type]?.label ?? signal.type }}
+              {{ signalTypeConfig[signal.signal_type]?.label ?? signal.signal_type }}
             </span>
 
-            <!-- Content -->
             <div class="flex-1 min-w-0">
               <div class="flex items-start justify-between gap-2">
                 <div>
-                  <p class="text-sm font-semibold text-gray-900">{{ signal.company }}</p>
+                  <p class="text-sm font-semibold text-gray-900">{{ signal.company_name }}</p>
                   <p class="text-sm text-gray-600 mt-0.5 leading-snug">{{ signal.summary }}</p>
                 </div>
                 <div class="flex-shrink-0 text-right">
-                  <div class="text-lg font-bold tabular-nums text-blue-600">{{ signal.relevance }}</div>
+                  <div class="text-lg font-bold tabular-nums text-blue-600">{{ signal.relevance_score }}</div>
                   <div class="text-[10px] text-gray-400">relevance</div>
                 </div>
               </div>
               <div class="flex items-center gap-3 mt-2">
-                <span class="text-xs text-gray-400">{{ signal.source }}</span>
+                <span class="text-xs text-gray-400">{{ signal.source ?? 'Unknown source' }}</span>
                 <span class="text-xs text-gray-300">·</span>
-                <span class="text-xs text-gray-400">{{ signal.detectedAt }}</span>
+                <span class="text-xs text-gray-400">{{ signal.detected_at }}</span>
                 <span v-if="signal.reviewed" class="inline-flex items-center gap-1 text-xs text-emerald-600">
                   <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -186,17 +158,6 @@ const filtered = computed(() => {
 
         <div v-if="!filtered.length" class="py-16 text-center">
           <p class="text-sm text-gray-400">No signals match the current filter.</p>
-        </div>
-      </div>
-
-      <!-- Phase notice -->
-      <div class="flex items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
-        <svg class="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-        </svg>
-        <div>
-          <p class="text-sm font-medium text-gray-700">Phase 2: Live Signal Detection</p>
-          <p class="text-xs text-gray-500 mt-0.5">In Phase 2, signals are detected automatically from configured sources — job boards, RSS feeds, public data imports, and manual entries. Each signal links to a company profile and feeds into opportunity scoring.</p>
         </div>
       </div>
     </div>

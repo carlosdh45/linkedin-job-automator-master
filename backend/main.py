@@ -20,6 +20,14 @@ from backend.api import (
     resume,
     review,
     stats,
+    bd_companies,
+    bd_prospects,
+    bd_signals,
+    bd_opportunities,
+    bd_deal_packets,
+    bd_pipeline,
+    bd_demo,
+    bd_message_studio,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,3 +69,13 @@ app.include_router(resume.router, prefix="/api")
 app.include_router(cv_import.router, prefix="/api")
 app.include_router(application_packet.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+
+# BD OS routers
+app.include_router(bd_companies.router, prefix="/api")
+app.include_router(bd_prospects.router, prefix="/api")
+app.include_router(bd_signals.router, prefix="/api")
+app.include_router(bd_opportunities.router, prefix="/api")
+app.include_router(bd_deal_packets.router, prefix="/api")
+app.include_router(bd_pipeline.router, prefix="/api")
+app.include_router(bd_demo.router, prefix="/api")
+app.include_router(bd_message_studio.router, prefix="/api")

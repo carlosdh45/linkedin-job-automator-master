@@ -5,6 +5,8 @@ import type {
   CVImportPreview, CVImportApplyRequest,
   ApplicationPacket, ApplicationPacketUpdate,
   ResumeQualityReport,
+  BDCompany, BDProspect, BDSignal, BDOpportunity, BDDealPacket,
+  BDPipelineResponse,
 } from '~/types'
 
 export const useApi = () => {
@@ -74,5 +76,55 @@ export const useApi = () => {
     getApplicationPacket: () => get<ApplicationPacket>('/api/application-packet'),
     updateApplicationPacket: (updates: ApplicationPacketUpdate) => put<ApplicationPacket>('/api/application-packet', updates),
     generateApplicationPacket: () => post<ApplicationPacket>('/api/application-packet/generate'),
+    // BD OS — Companies
+    getBDCompanies: () => get<BDCompany[]>('/api/bd/companies'),
+    getBDCompany: (id: string) => get<BDCompany>(`/api/bd/companies/${id}`),
+    createBDCompany: (data: Partial<BDCompany>) => post<BDCompany>('/api/bd/companies', data),
+    updateBDCompany: (id: string, data: Partial<BDCompany>) => put<BDCompany>(`/api/bd/companies/${id}`, data),
+    // BD OS — Prospects
+    getBDProspects: () => get<BDProspect[]>('/api/bd/prospects'),
+    getBDProspect: (id: string) => get<BDProspect>(`/api/bd/prospects/${id}`),
+    createBDProspect: (data: Partial<BDProspect>) => post<BDProspect>('/api/bd/prospects', data),
+    updateBDProspect: (id: string, data: Partial<BDProspect>) => put<BDProspect>(`/api/bd/prospects/${id}`, data),
+    // BD OS — Signals
+    getBDSignals: () => get<BDSignal[]>('/api/bd/signals'),
+    createBDSignal: (data: Partial<BDSignal>) => post<BDSignal>('/api/bd/signals', data),
+    // BD OS — Opportunities
+    getBDOpportunities: () => get<BDOpportunity[]>('/api/bd/opportunities'),
+    scoreBDOpportunity: (req: {
+      icp_match?: boolean
+      pain_point_count?: number
+      signal_count?: number
+      prospect_seniority?: string
+      days_since_last_signal?: number
+      existing_relationship?: boolean
+    }) => post<{ score: number; score_label: string; breakdown: Record<string, number> }>('/api/bd/opportunities/score', req),
+    // BD OS — Deal Packets
+    getBDDealPackets: () => get<BDDealPacket[]>('/api/bd/deal-packets'),
+    getBDDealPacket: (id: string) => get<BDDealPacket>(`/api/bd/deal-packets/${id}`),
+    generateBDDealPacket: (req: {
+      company_name: string
+      company_id?: string
+      contact_name?: string
+      contact_role?: string
+      engagement_type?: string
+      pain_points?: string[]
+      notes?: string
+    }) => post<BDDealPacket>('/api/bd/deal-packets/generate', req),
+    // BD OS — Pipeline
+    getBDPipeline: () => get<BDPipelineResponse>('/api/bd/pipeline'),
+    // BD OS — Message Studio
+    generateBDDraft: (req: {
+      company_name: string
+      contact_name: string
+      contact_role?: string
+      pain_point?: string
+      angle?: string
+      message_type?: string
+      tone?: string
+    }) => post<{ draft: string; subject: string | null; safety_notice: string; message_type: string; tone: string }>('/api/bd/message-studio/draft', req),
+    // BD OS — Demo
+    seedBDDemo: () => post<{ seeded: boolean; stats: Record<string, number> }>('/api/bd/demo/seed'),
+    clearBDDemo: () => post<{ cleared: boolean }>('/api/bd/demo/clear'),
   }
 }
