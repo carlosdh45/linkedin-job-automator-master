@@ -3,9 +3,9 @@ from fastapi import APIRouter, Depends
 from backend.config import (
     get_bd_company_path, get_bd_prospect_path, get_bd_signal_path,
     get_bd_pain_point_path, get_bd_opportunity_path,
-    get_bd_deal_packet_path, get_bd_outreach_path,
+    get_bd_deal_packet_path, get_bd_outreach_path, get_bd_icp_config_path,
 )
-from backend.services.bd_seed import seed_bd_demo, clear_bd_demo
+from backend.services.bd_seed import seed_bd_demo, clear_bd_demo, seed_icp_demo
 
 router = APIRouter(prefix="/bd/demo", tags=["bd-demo"])
 
@@ -19,12 +19,14 @@ def bd_seed(
     opportunity_path: str = Depends(get_bd_opportunity_path),
     deal_packet_path: str = Depends(get_bd_deal_packet_path),
     outreach_path: str = Depends(get_bd_outreach_path),
+    icp_config_path: str = Depends(get_bd_icp_config_path),
 ):
-    """Seed BD OS with local demo data. No external calls."""
+    """Seed BD OS with local demo data and default ICP config. No external calls."""
     stats = seed_bd_demo(
         company_path, prospect_path, signal_path,
         pain_point_path, opportunity_path, deal_packet_path, outreach_path,
     )
+    seed_icp_demo(icp_config_path)
     return {"seeded": True, "stats": stats}
 
 

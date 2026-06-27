@@ -90,9 +90,8 @@ const topRecommendations = computed(() =>
 
 async function seedDemo() {
   try {
-    await api.seedDemo()
-    await refresh()
-    await refreshBD()
+    await Promise.all([api.seedDemo(), api.seedBDDemo()])
+    await Promise.all([refresh(), refreshBD()])
   } catch {
     // non-critical
   }
@@ -173,6 +172,88 @@ async function dismissRec(id: string) {
       </template>
 
       <template v-else-if="brief">
+        <!-- Quick Start (shown until first demo seed) -->
+        <div v-if="!hasRealBDData" class="rounded-xl border border-blue-100 bg-blue-50/60 px-5 py-5">
+          <div class="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <p class="text-sm font-semibold text-gray-900">Quick Start — run your first BD workflow</p>
+              <p class="text-xs text-gray-500 mt-0.5">Follow these 8 steps to explore the full BD OS from signal detection to human-reviewed outreach.</p>
+            </div>
+            <button
+              class="flex-shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+              @click="showSeedConfirm = true"
+            >
+              Load Demo Data
+            </button>
+          </div>
+          <ol class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <li class="flex items-start gap-3 rounded-lg border border-blue-200 bg-white px-4 py-3">
+              <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white mt-0.5">1</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-gray-900">Seed demo data</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">Load 6 companies, 7 signals, 5 opportunities, and 3 deal packets with a default ICP.</p>
+              </div>
+              <button class="text-[11px] text-blue-600 hover:underline flex-shrink-0 mt-0.5 font-medium" @click="showSeedConfirm = true">Seed →</button>
+            </li>
+            <li class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 mt-0.5">2</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-gray-900">Configure your ICP</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">Set target industries, roles, and pain point priorities. Demo defaults are pre-loaded.</p>
+              </div>
+              <NuxtLink to="/settings" class="text-[11px] text-blue-600 hover:underline flex-shrink-0 mt-0.5 font-medium">Settings →</NuxtLink>
+            </li>
+            <li class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 mt-0.5">3</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-gray-900">Review buying signals</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">See hiring spikes, leadership changes, and pain point mentions detected for each account.</p>
+              </div>
+              <NuxtLink to="/signals" class="text-[11px] text-blue-600 hover:underline flex-shrink-0 mt-0.5 font-medium">Signals →</NuxtLink>
+            </li>
+            <li class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 mt-0.5">4</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-gray-900">Run signal refresh</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">Generate ICP-aware recommendations from signals. Runs locally — no external calls.</p>
+              </div>
+              <button class="text-[11px] text-blue-600 hover:underline flex-shrink-0 mt-0.5 font-medium" @click="runRefresh">Refresh →</button>
+            </li>
+            <li class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 mt-0.5">5</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-gray-900">Evaluate an opportunity</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">Score a qualified account and see the full ICP breakdown: pain points, signals, seniority.</p>
+              </div>
+              <NuxtLink to="/opportunities" class="text-[11px] text-blue-600 hover:underline flex-shrink-0 mt-0.5 font-medium">Opportunities →</NuxtLink>
+            </li>
+            <li class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 mt-0.5">6</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-gray-900">Open a deal packet</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">Review the company briefing, pain point analysis, value proposition, and talking points.</p>
+              </div>
+              <NuxtLink to="/deal-packets" class="text-[11px] text-blue-600 hover:underline flex-shrink-0 mt-0.5 font-medium">Deal Packets →</NuxtLink>
+            </li>
+            <li class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 mt-0.5">7</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-gray-900">Draft outreach in Message Studio</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">Generate a personalized first-touch message. Local template — no AI API calls.</p>
+              </div>
+              <NuxtLink to="/message-studio" class="text-[11px] text-blue-600 hover:underline flex-shrink-0 mt-0.5 font-medium">Studio →</NuxtLink>
+            </li>
+            <li class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 mt-0.5">8</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-gray-900">Review and approve outreach</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">All drafts land here. Approve for manual send — DobryBot never sends automatically.</p>
+              </div>
+              <NuxtLink to="/review-queue" class="text-[11px] text-blue-600 hover:underline flex-shrink-0 mt-0.5 font-medium">Review Queue →</NuxtLink>
+            </li>
+          </ol>
+        </div>
+
         <!-- Stats -->
         <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
@@ -507,7 +588,7 @@ async function dismissRec(id: string) {
     <ConfirmDialog
       v-model="showSeedConfirm"
       title="Load Demo Data?"
-      message="This will seed safe demo records (fake .test domains, no real companies or emails) into the database. Use it to explore the dashboard without a real config.yaml."
+      message="Seeds 6 target companies, 6 prospects, 7 buying signals, 5 opportunities, 3 deal packets, and 3 outreach drafts — plus a default ICP configuration. All data is fictional and local. No external calls are made."
       confirm-label="Seed Demo Data"
       variant="info"
       @confirm="seedDemo"

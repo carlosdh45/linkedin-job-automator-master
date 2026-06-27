@@ -158,6 +158,15 @@ export const useApi = () => {
     // BD OS — ICP Config
     getICPConfig: () => get<BDICPConfig>('/api/bd/icp-config'),
     updateICPConfig: (data: BDICPConfigUpdate) => put<BDICPConfig>('/api/bd/icp-config', data),
+    resetICPToDemo: () => put<BDICPConfig>('/api/bd/icp-config', {
+      target_industries: ['SaaS', 'Financial Services', 'Private Equity', 'Logistics', 'Healthcare Operations', 'Professional Services', 'Mid-market Technology'],
+      company_size_min: 50,
+      company_size_max: 2000,
+      target_roles: ['CEO', 'Founder', 'COO', 'CTO', 'VP Operations', 'VP Sales', 'Managing Partner', 'Head of Business Development'],
+      pain_point_priorities: ['manual prospecting', 'low outbound conversion', 'poor lead qualification', 'disconnected CRM data', 'slow deal origination', 'lack of market signal tracking', 'offshore execution bottlenecks'],
+      signal_priorities: ['hiring', 'leadership_change', 'pain_point', 'funding', 'growth'],
+      scoring_weights: { icp_match: 30, pain_points: 25, signals: 20, seniority: 15, urgency: 7, existing_relationship: 3 },
+    }),
     // BD OS — Dashboard Stats
     getBDDashboard: () => get<BDDashboardStats>('/api/bd/dashboard'),
     // BD OS — Move Stage

@@ -40,6 +40,7 @@ const icpForm = reactive({
 })
 
 const isSavingICP = ref(false)
+const isResettingICP = ref(false)
 const icpSaveSuccess = ref(false)
 const icpSaveError = ref<string | null>(null)
 
@@ -74,6 +75,21 @@ async function saveICP() {
     icpSaveError.value = 'Could not save ICP config — make sure the backend is running.'
   } finally {
     isSavingICP.value = false
+  }
+}
+
+async function resetToDemo() {
+  icpSaveError.value = null
+  icpSaveSuccess.value = false
+  isResettingICP.value = true
+  try {
+    await api.resetICPToDemo()
+    icpSaveSuccess.value = true
+    await refreshICP()
+  } catch {
+    icpSaveError.value = 'Could not reset ICP config — make sure the backend is running.'
+  } finally {
+    isResettingICP.value = false
   }
 }
 
@@ -189,7 +205,7 @@ const scoringWeightKeys = computed(() =>
 
           <!-- Scoring weights (read-only display) -->
           <div v-if="scoringWeightKeys.length">
-            <label class="block text-xs font-semibold text-gray-700 mb-2">Current Scoring Weights</label>
+            <label class="block text-xs font-semibold text-gray-700 mb-2">Scoring Weights</label>
             <div class="grid grid-cols-2 gap-2">
               <div
                 v-for="[key, val] in scoringWeightKeys"
@@ -200,16 +216,23 @@ const scoringWeightKeys = computed(() =>
                 <span class="text-xs font-semibold text-gray-800 tabular-nums">{{ val }} pts</span>
               </div>
             </div>
-            <p class="text-xs text-gray-400 mt-2">Weights are stored in ICP config and applied during local scoring.</p>
+            <p class="text-xs text-gray-400 mt-2">Total 100 pts. Applied during local scoring — icp_match rewards target industry/role fit, pain_points rewards confirmed operational pain, signals rewards recent buying activity, seniority rewards C-suite / VP contacts, urgency rewards recency of last signal.</p>
           </div>
 
-          <div class="flex items-center gap-3 pt-1">
+          <div class="flex items-center gap-3 pt-1 flex-wrap">
             <button
               class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="isSavingICP"
+              :disabled="isSavingICP || isResettingICP"
               @click="saveICP"
             >
               {{ isSavingICP ? 'Saving…' : 'Save ICP Config' }}
+            </button>
+            <button
+              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="isSavingICP || isResettingICP"
+              @click="resetToDemo"
+            >
+              {{ isResettingICP ? 'Resetting…' : 'Use Demo ICP Defaults' }}
             </button>
             <span v-if="icpSaveSuccess" class="text-xs text-emerald-600 font-medium">Saved — affects local scoring</span>
             <span v-if="icpSaveError" class="text-xs text-red-600">{{ icpSaveError }}</span>
