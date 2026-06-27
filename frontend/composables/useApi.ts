@@ -16,6 +16,7 @@ import type {
   BDCompanyEvaluationResult,
   BDOpportunityRecalculateResult,
   BDRecommendationRefreshResult,
+  BDEvaluateAllResult,
 } from '~/types'
 
 export const useApi = () => {
@@ -200,6 +201,16 @@ export const useApi = () => {
       post<BDRecommendation>(`/api/bd/recommendations/${id}/dismiss`),
     actionBDRecommendation: (id: string) =>
       post<BDRecommendation>(`/api/bd/recommendations/${id}/action`),
+    reviewBDRecommendation: (id: string) =>
+      post<BDRecommendation>(`/api/bd/recommendations/${id}/review`),
+    createOpportunityFromRec: (id: string) =>
+      post<BDOpportunity>(`/api/bd/recommendations/${id}/create-opportunity`),
+    // BD OS — Evaluate All Signals (Phase 15)
+    evaluateAllBDSignals: () =>
+      post<BDEvaluateAllResult>('/api/bd/signals/evaluate-all'),
+    // BD OS — Create Opportunity
+    createBDOpportunity: (data: Partial<BDOpportunity>) =>
+      post<BDOpportunity>('/api/bd/opportunities', data),
     // BD OS — CSV Import
     importCSV: (type: 'companies' | 'prospects' | 'signals', file: File, dryRun = true) => {
       const form = new FormData()

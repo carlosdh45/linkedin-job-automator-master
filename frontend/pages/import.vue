@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BDImportResult } from '~/types'
+import type { BDImportResult, BDEvaluateAllResult } from '~/types'
 
 const api = useApi()
 
@@ -13,6 +13,38 @@ const isRunning = ref(false)
 const previewResult = ref<BDImportResult | null>(null)
 const commitResult = ref<BDImportResult | null>(null)
 const errorMsg = ref<string | null>(null)
+
+// Next-steps state after a successful commit
+const isEvaluatingAll = ref(false)
+const isRefreshingRecs = ref(false)
+const evaluateAllResult = ref<BDEvaluateAllResult | null>(null)
+const recsRefreshed = ref(false)
+const nextStepsError = ref<string | null>(null)
+
+async function evaluateAll() {
+  isEvaluatingAll.value = true
+  nextStepsError.value = null
+  try {
+    evaluateAllResult.value = await api.evaluateAllBDSignals()
+  } catch {
+    nextStepsError.value = 'Could not evaluate signals — make sure the backend is running.'
+  } finally {
+    isEvaluatingAll.value = false
+  }
+}
+
+async function refreshRecs() {
+  isRefreshingRecs.value = true
+  nextStepsError.value = null
+  try {
+    await api.refreshBDRecommendations()
+    recsRefreshed.value = true
+  } catch {
+    nextStepsError.value = 'Could not refresh recommendations.'
+  } finally {
+    isRefreshingRecs.value = false
+  }
+}
 
 const tabs: { key: ImportType; label: string; description: string }[] = [
   {
@@ -44,6 +76,9 @@ function clearState() {
   previewResult.value = null
   commitResult.value = null
   errorMsg.value = null
+  evaluateAllResult.value = null
+  recsRefreshed.value = false
+  nextStepsError.value = null
   if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
@@ -322,6 +357,104 @@ function downloadTemplate(type: ImportType) {
         <!-- Safety notice -->
         <div class="px-5 py-3 border-t border-gray-100">
           <p class="text-[11px] text-gray-400">{{ activeResult.safety_notice }}</p>
+        </div>
+      </AppCard>
+
+      <!-- Next Steps (shown after successful commit) -->
+      <AppCard v-if="commitResult && commitResult.imported_count > 0">
+        <div class="px-5 py-3.5 border-b border-gray-100">
+          <h3 class="text-sm font-semibold text-gray-900">Next Steps</h3>
+          <p class="text-xs text-gray-400 mt-0.5">Your data is imported — here's the recommended workflow</p>
+        </div>
+        <div class="px-5 py-4 space-y-4">
+
+          <!-- Navigation links -->
+          <div class="flex flex-wrap gap-2">
+            <NuxtLink
+              v-if="commitResult.import_type === 'companies' || commitResult.import_type === 'prospects'"
+              to="/companies"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              View Companies →
+            </NuxtLink>
+            <NuxtLink
+              v-if="commitResult.import_type === 'prospects'"
+              to="/prospects"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              View Prospects →
+            </NuxtLink>
+            <NuxtLink
+              to="/signals"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              View Signals →
+            </NuxtLink>
+            <NuxtLink
+              to="/opportunities"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Opportunities →
+            </NuxtLink>
+          </div>
+
+          <!-- Action: Evaluate signals -->
+          <div class="rounded-lg border border-violet-100 bg-violet-50 px-4 py-3">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold text-violet-900">Evaluate signals</p>
+                <p class="text-[11px] text-violet-700 mt-0.5 leading-snug">
+                  Run local rule-based evaluation on all unevaluated signals to surface recommendations.
+                  No external calls.
+                </p>
+                <p v-if="evaluateAllResult" class="text-[11px] text-violet-800 font-medium mt-1">
+                  Done — {{ evaluateAllResult.evaluated_count }} evaluated,
+                  {{ evaluateAllResult.recommendations_created }} recommendation(s) created.
+                </p>
+              </div>
+              <button
+                class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
+                :disabled="isEvaluatingAll || !!evaluateAllResult"
+                @click="evaluateAll"
+              >
+                <span v-if="isEvaluatingAll" class="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                {{ evaluateAllResult ? 'Done' : isEvaluatingAll ? 'Evaluating…' : 'Evaluate All Signals' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Action: Refresh recommendations -->
+          <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold text-blue-900">Refresh recommendations</p>
+                <p class="text-[11px] text-blue-700 mt-0.5 leading-snug">
+                  Re-score companies and opportunities against your ICP to generate prioritized next actions.
+                </p>
+                <p v-if="recsRefreshed" class="text-[11px] text-blue-800 font-medium mt-1">
+                  Recommendations refreshed — view them on the Command Center.
+                </p>
+              </div>
+              <button
+                class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                :disabled="isRefreshingRecs || recsRefreshed"
+                @click="refreshRecs"
+              >
+                <span v-if="isRefreshingRecs" class="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                {{ recsRefreshed ? 'Done' : isRefreshingRecs ? 'Refreshing…' : 'Refresh Recommendations' }}
+              </button>
+            </div>
+          </div>
+
+          <p v-if="nextStepsError" class="text-xs text-red-600">{{ nextStepsError }}</p>
+
+          <!-- Workflow reminder -->
+          <div class="flex items-start gap-2 text-[11px] text-gray-400 border-t border-gray-100 pt-3">
+            <svg class="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Workflow: Import → Evaluate Signals → Review Recommendations → Generate Deal Packet → Draft Message → Review Queue → Manual execution
+          </div>
         </div>
       </AppCard>
 

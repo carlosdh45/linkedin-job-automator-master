@@ -13,7 +13,7 @@ from backend.config import (
     get_bd_activity_path, get_bd_icp_config_path,
 )
 from backend.models.bd import (
-    BDRecommendation, BDRecommendationRefreshResult,
+    BDRecommendation, BDRecommendationRefreshResult, BDOpportunity,
 )
 from backend.services.bd_recommendation_store import (
     list_recommendations, get_recommendation, create_recommendation,
@@ -21,7 +21,7 @@ from backend.services.bd_recommendation_store import (
 )
 from backend.services.bd_company_store import list_companies, get_company, update_company
 from backend.services.bd_signal_store import list_signals, get_signal, update_signal
-from backend.services.bd_opportunity_store import list_opportunities, update_opportunity
+from backend.services.bd_opportunity_store import list_opportunities, update_opportunity, create_opportunity
 from backend.services.bd_prospect_store import list_prospects
 from backend.services.bd_pain_point_store import list_by_company, list_pain_points
 from backend.services.bd_activity_store import log_activity
@@ -45,6 +45,93 @@ def get_recommendations(
     path: str = Depends(get_bd_recommendation_path),
 ):
     return list_recommendations(path, status=status, entity_type=entity_type, priority=priority, limit=limit)
+
+
+@router.post("/{rec_id}/review", response_model=BDRecommendation)
+def review_recommendation(
+    rec_id: str,
+    path: str = Depends(get_bd_recommendation_path),
+    activity_path: str = Depends(get_bd_activity_path),
+):
+    """Mark a recommendation as reviewed. No auto-action. Human decides next step."""
+    rec = get_recommendation(path, rec_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Recommendation not found")
+    updated = update_recommendation(path, rec_id, {"status": "reviewed"})
+    log_activity(activity_path, {
+        "entity_type": rec.entity_type,
+        "entity_id": rec.entity_id,
+        "action": "recommendation_reviewed",
+        "description": f"Recommendation for {rec.entity_name} marked as reviewed",
+        "metadata": {"recommendation_id": rec_id, "priority": rec.priority},
+    })
+    return updated
+
+
+@router.post("/{rec_id}/create-opportunity", response_model=BDOpportunity)
+def create_opportunity_from_recommendation(
+    rec_id: str,
+    path: str = Depends(get_bd_recommendation_path),
+    opportunity_path: str = Depends(get_bd_opportunity_path),
+    signal_path: str = Depends(get_bd_signal_path),
+    company_path: str = Depends(get_bd_company_path),
+    activity_path: str = Depends(get_bd_activity_path),
+):
+    """
+    Create a BD opportunity from a signal or company recommendation.
+    Local only — no auto-outreach. Human review required before any action.
+    """
+    rec = get_recommendation(path, rec_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Recommendation not found")
+
+    # Resolve company from the recommendation entity
+    company = None
+    if rec.entity_type == "signal":
+        sig = get_signal(signal_path, rec.entity_id)
+        if sig and sig.company_id:
+            company = get_company(company_path, sig.company_id)
+    elif rec.entity_type == "company":
+        company = get_company(company_path, rec.entity_id)
+
+    company_id = company.id if company else rec.entity_id
+    company_name = company.name if company else rec.entity_name
+
+    score, label, _ = compute_opportunity_score(
+        icp_match=company.icp_match if company else False,
+        pain_point_count=len(company.pain_points) if company else 0,
+        signal_count=0,
+        company_size=company.size_estimate if company else None,
+        prospect_seniority=None,
+        days_since_last_signal=None,
+        existing_relationship=False,
+    )
+
+    opp = create_opportunity(opportunity_path, {
+        "company_id": company_id,
+        "company_name": company_name,
+        "stage": "identified",
+        "pain_points": (company.pain_points[:3] if company else []),
+        "value_proposition": rec.recommended_action,
+        "recommended_action": rec.recommended_action,
+        "score": score,
+        "score_label": label,
+        "notes": f"Created from {rec.priority} recommendation: {rec.reason}",
+    })
+
+    update_recommendation(path, rec_id, {"status": "actioned"})
+
+    log_activity(activity_path, {
+        "entity_type": "opportunity",
+        "entity_id": opp.id,
+        "action": "opportunity_created_from_recommendation",
+        "description": (
+            f"Opportunity created for {company_name} from {rec.priority} recommendation"
+        ),
+        "metadata": {"recommendation_id": rec_id, "priority": rec.priority},
+    })
+
+    return opp
 
 
 @router.post("/{rec_id}/dismiss", response_model=BDRecommendation)

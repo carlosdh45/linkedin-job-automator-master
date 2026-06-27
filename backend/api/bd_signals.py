@@ -6,9 +6,9 @@ from backend.config import (
     get_bd_signal_path, get_bd_company_path, get_bd_prospect_path,
     get_bd_activity_path, get_bd_recommendation_path, get_bd_icp_config_path,
 )
-from backend.models.bd import BDSignal, BDSignalCreate, BDSignalEvaluationResult
+from backend.models.bd import BDSignal, BDSignalCreate, BDSignalEvaluationResult, BDEvaluateAllResult
 from backend.services.bd_signal_store import list_signals, create_signal, get_signal, update_signal
-from backend.services.bd_company_store import get_company
+from backend.services.bd_company_store import get_company, list_companies
 from backend.services.bd_prospect_store import list_prospects
 from backend.services.bd_activity_store import log_activity
 from backend.services.bd_recommendation_store import create_recommendation
@@ -29,6 +29,76 @@ def create_signal_endpoint(data: BDSignalCreate, path: str = Depends(get_bd_sign
     if not payload.get("detected_at"):
         payload["detected_at"] = datetime.utcnow().date().isoformat()
     return create_signal(path, payload)
+
+
+@router.post("/evaluate-all", response_model=BDEvaluateAllResult)
+def evaluate_all_signals(
+    signal_path: str = Depends(get_bd_signal_path),
+    company_path: str = Depends(get_bd_company_path),
+    prospect_path: str = Depends(get_bd_prospect_path),
+    activity_path: str = Depends(get_bd_activity_path),
+    recommendation_path: str = Depends(get_bd_recommendation_path),
+    icp_path: str = Depends(get_bd_icp_config_path),
+):
+    """
+    Evaluate all unevaluated signals using local rule-based intelligence.
+    No external API calls. Recommendations require explicit human review.
+    """
+    signals = list_signals(signal_path)
+    companies = list_companies(company_path)
+    prospects = list_prospects(prospect_path)
+    icp_config = load_icp_config(icp_path)
+
+    now = datetime.utcnow().isoformat()
+    evaluated = 0
+    skipped = 0
+    recs_created = 0
+
+    for sig in signals:
+        if sig.evaluated:
+            skipped += 1
+            continue
+        company = next((c for c in companies if c.id == sig.company_id), None)
+        result = _evaluate_signal(sig, company, icp_config, prospects)
+
+        update_signal(signal_path, sig.id, {
+            "evaluated": True,
+            "evaluated_at": now,
+            "signal_strength": result["signal_strength"],
+        })
+
+        if result["priority"] in ("high", "critical"):
+            create_recommendation(recommendation_path, {
+                "entity_type": "signal",
+                "entity_id": sig.id,
+                "entity_name": sig.company_name,
+                "priority": result["priority"],
+                "reason": result["reason"],
+                "recommended_action": result["recommended_action"],
+                "confidence_score": result["confidence_score"],
+            })
+            recs_created += 1
+
+        log_activity(activity_path, {
+            "entity_type": "signal",
+            "entity_id": sig.id,
+            "action": "signal_evaluated",
+            "description": (
+                f"Signal from {sig.company_name} evaluated — strength: {result['signal_strength']}"
+            ),
+            "metadata": {
+                "priority": result["priority"],
+                "signal_strength": result["signal_strength"],
+                "confidence_score": result["confidence_score"],
+            },
+        })
+        evaluated += 1
+
+    return BDEvaluateAllResult(
+        evaluated_count=evaluated,
+        skipped_count=skipped,
+        recommendations_created=recs_created,
+    )
 
 
 @router.post("/{signal_id}/evaluate", response_model=BDSignalEvaluationResult)

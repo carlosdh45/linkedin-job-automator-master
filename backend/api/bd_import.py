@@ -6,12 +6,14 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from backend.config import (
     get_bd_company_path, get_bd_prospect_path, get_bd_signal_path,
+    get_bd_activity_path,
 )
 from backend.models.bd import BDImportResult
 from backend.services.bd_csv_import import (
     import_companies_csv, import_prospects_csv, import_signals_csv,
     COMPANIES_TEMPLATE, PROSPECTS_TEMPLATE, SIGNALS_TEMPLATE,
 )
+from backend.services.bd_activity_store import log_activity
 from fastapi.responses import PlainTextResponse
 
 router = APIRouter(prefix="/bd/import", tags=["bd-import"])
@@ -33,6 +35,7 @@ async def import_companies(
     file: UploadFile = File(...),
     dry_run: bool = Query(default=True, description="Preview without committing"),
     company_path: str = Depends(get_bd_company_path),
+    activity_path: str = Depends(get_bd_activity_path),
 ):
     """
     Import companies from a CSV file. Local only — no external API calls.
@@ -40,7 +43,24 @@ async def import_companies(
     """
     _validate_upload(file)
     content = await file.read()
-    return import_companies_csv(content, company_path, dry_run=dry_run)
+    result = import_companies_csv(content, company_path, dry_run=dry_run)
+    if not dry_run and result.imported_count > 0:
+        log_activity(activity_path, {
+            "entity_type": "import",
+            "entity_id": "companies-csv",
+            "action": "csv_import_committed",
+            "description": (
+                f"CSV import committed: {result.imported_count} companies imported, "
+                f"{result.duplicate_count} duplicates skipped"
+            ),
+            "metadata": {
+                "import_type": "companies",
+                "imported_count": result.imported_count,
+                "duplicate_count": result.duplicate_count,
+                "skipped_count": result.skipped_count,
+            },
+        })
+    return result
 
 
 @router.post("/prospects-csv", response_model=BDImportResult)
@@ -49,6 +69,7 @@ async def import_prospects(
     dry_run: bool = Query(default=True, description="Preview without committing"),
     prospect_path: str = Depends(get_bd_prospect_path),
     company_path: str = Depends(get_bd_company_path),
+    activity_path: str = Depends(get_bd_activity_path),
 ):
     """
     Import prospects from a CSV file. Local only — no external API calls.
@@ -56,7 +77,24 @@ async def import_prospects(
     """
     _validate_upload(file)
     content = await file.read()
-    return import_prospects_csv(content, prospect_path, company_path, dry_run=dry_run)
+    result = import_prospects_csv(content, prospect_path, company_path, dry_run=dry_run)
+    if not dry_run and result.imported_count > 0:
+        log_activity(activity_path, {
+            "entity_type": "import",
+            "entity_id": "prospects-csv",
+            "action": "csv_import_committed",
+            "description": (
+                f"CSV import committed: {result.imported_count} prospects imported, "
+                f"{result.duplicate_count} duplicates skipped"
+            ),
+            "metadata": {
+                "import_type": "prospects",
+                "imported_count": result.imported_count,
+                "duplicate_count": result.duplicate_count,
+                "skipped_count": result.skipped_count,
+            },
+        })
+    return result
 
 
 @router.post("/signals-csv", response_model=BDImportResult)
@@ -65,6 +103,7 @@ async def import_signals(
     dry_run: bool = Query(default=True, description="Preview without committing"),
     signal_path: str = Depends(get_bd_signal_path),
     company_path: str = Depends(get_bd_company_path),
+    activity_path: str = Depends(get_bd_activity_path),
 ):
     """
     Import signals from a CSV file. Local only — no external API calls.
@@ -72,7 +111,24 @@ async def import_signals(
     """
     _validate_upload(file)
     content = await file.read()
-    return import_signals_csv(content, signal_path, company_path, dry_run=dry_run)
+    result = import_signals_csv(content, signal_path, company_path, dry_run=dry_run)
+    if not dry_run and result.imported_count > 0:
+        log_activity(activity_path, {
+            "entity_type": "import",
+            "entity_id": "signals-csv",
+            "action": "csv_import_committed",
+            "description": (
+                f"CSV import committed: {result.imported_count} signals imported, "
+                f"{result.duplicate_count} duplicates skipped"
+            ),
+            "metadata": {
+                "import_type": "signals",
+                "imported_count": result.imported_count,
+                "duplicate_count": result.duplicate_count,
+                "skipped_count": result.skipped_count,
+            },
+        })
+    return result
 
 
 @router.get("/templates", response_class=PlainTextResponse)

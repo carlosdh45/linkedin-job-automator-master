@@ -3,13 +3,14 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.config import get_bd_deal_packet_path
+from backend.config import get_bd_deal_packet_path, get_bd_activity_path
 from backend.models.bd import (
     BDDealPacket, BDDealPacketGenerateRequest, BDChecklistItem,
 )
 from backend.services.bd_deal_packet_store import (
     list_deal_packets, get_deal_packet, create_deal_packet,
 )
+from backend.services.bd_activity_store import log_activity
 
 router = APIRouter(prefix="/bd/deal-packets", tags=["bd-deal-packets"])
 
@@ -98,6 +99,7 @@ def get_deal_packet_by_id(packet_id: str, path: str = Depends(get_bd_deal_packet
 def generate_deal_packet(
     req: BDDealPacketGenerateRequest,
     path: str = Depends(get_bd_deal_packet_path),
+    activity_path: str = Depends(get_bd_activity_path),
 ):
     """
     Generate a local deal packet using rule-based templates. No AI. No external calls.
@@ -105,4 +107,19 @@ def generate_deal_packet(
     """
     packet = _generate_packet(req)
     packet.updated_at = datetime.utcnow().isoformat()
-    return create_deal_packet(path, packet)
+    saved = create_deal_packet(path, packet)
+    log_activity(activity_path, {
+        "entity_type": "deal_packet",
+        "entity_id": saved.id,
+        "action": "deal_packet_generated",
+        "description": (
+            f"Deal packet generated for {saved.company_name}"
+            + (f" / {saved.contact_name}" if saved.contact_name else "")
+        ),
+        "metadata": {
+            "company_name": saved.company_name,
+            "contact_name": saved.contact_name,
+            "pain_points": saved.pain_points,
+        },
+    })
+    return saved

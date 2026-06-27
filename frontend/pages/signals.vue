@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BDSignal, BDSignalEvaluationResult, BDCompany } from '~/types'
+import type { BDSignal, BDSignalEvaluationResult, BDCompany, BDEvaluateAllResult } from '~/types'
 
 const api = useApi()
 
@@ -135,6 +135,26 @@ const showReviewed = ref(true)
 const evaluating = ref<string | null>(null)
 const lastResult = ref<BDSignalEvaluationResult | null>(null)
 
+// Evaluate All
+const isEvaluatingAll = ref(false)
+const evaluateAllResult = ref<BDEvaluateAllResult | null>(null)
+
+const unevaluatedCount = computed(() => (signals.value ?? []).filter(s => !s.evaluated).length)
+
+async function evaluateAll() {
+  isEvaluatingAll.value = true
+  evaluateAllResult.value = null
+  try {
+    const result = await api.evaluateAllBDSignals()
+    evaluateAllResult.value = result
+    await refresh()
+  } catch {
+    // non-critical
+  } finally {
+    isEvaluatingAll.value = false
+  }
+}
+
 const typeFilters = [
   { value: 'all', label: 'All Types' },
   { value: 'hiring', label: 'Hiring' },
@@ -173,7 +193,7 @@ async function evaluateSignal(signal: BDSignal) {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
       title="Signals"
-      :subtitle="pending ? 'Loading…' : `${filtered.length} buying signals — ${evaluatedCount} evaluated · Hiring, leadership changes, pain points, and more`"
+      :subtitle="pending ? 'Loading…' : `${filtered.length} signals — ${evaluatedCount} evaluated${unevaluatedCount > 0 ? ` · ${unevaluatedCount} unevaluated` : ''} · Hiring, leadership changes, pain points, and more`"
     >
       <template #actions>
         <button
@@ -184,6 +204,18 @@ async function evaluateSignal(signal: BDSignal) {
           @click="showReviewed = !showReviewed"
         >
           {{ showReviewed ? 'Show unreviewed only' : 'Show all' }}
+        </button>
+        <button
+          v-if="unevaluatedCount > 0"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors disabled:opacity-50"
+          :disabled="isEvaluatingAll"
+          @click="evaluateAll"
+        >
+          <span v-if="isEvaluatingAll" class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <svg v-else class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+          </svg>
+          {{ isEvaluatingAll ? 'Evaluating…' : `Evaluate All (${unevaluatedCount})` }}
         </button>
         <button
           class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
@@ -322,6 +354,33 @@ async function evaluateSignal(signal: BDSignal) {
           </p>
         </div>
         <button class="text-violet-400 hover:text-violet-600" @click="lastResult = null">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Evaluate-All result toast -->
+      <div
+        v-if="evaluateAllResult"
+        class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex items-start gap-3"
+      >
+        <svg class="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+        </svg>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-blue-900">
+            {{ evaluateAllResult.evaluated_count }} signal{{ evaluateAllResult.evaluated_count !== 1 ? 's' : '' }} evaluated
+            · {{ evaluateAllResult.skipped_count }} already done
+          </p>
+          <p v-if="evaluateAllResult.recommendations_created > 0" class="text-xs text-blue-700 mt-0.5">
+            {{ evaluateAllResult.recommendations_created }} new recommendation{{ evaluateAllResult.recommendations_created !== 1 ? 's' : '' }} created — review them on the Command Center.
+          </p>
+          <p v-else class="text-xs text-blue-600 mt-0.5">
+            No new high-priority recommendations from this batch.
+          </p>
+        </div>
+        <button class="text-blue-400 hover:text-blue-600" @click="evaluateAllResult = null">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>

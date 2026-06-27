@@ -258,20 +258,30 @@ async function flagResearch(id: string) {
                 </div>
                 <pre class="whitespace-pre-wrap font-sans text-sm text-gray-700 leading-relaxed">{{ displayDraft }}</pre>
 
-                <!-- Save action -->
-                <div class="mt-4 pt-4 border-t border-gray-100 flex items-center gap-3">
-                  <button
-                    class="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    :disabled="isSaving"
-                    @click="saveDraft"
-                  >
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M17 16v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2M9 12l3 3 3-3M12 3v12" />
+                <!-- Send to Review Queue -->
+                <div class="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                  <div class="flex items-center gap-3">
+                    <button
+                      class="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      :disabled="isSaving"
+                      @click="saveDraft"
+                    >
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 16v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2M9 12l3 3 3-3M12 3v12" />
+                      </svg>
+                      {{ isSaving ? 'Saving…' : 'Send to Review Queue' }}
+                    </button>
+                    <span v-if="saveError" class="text-xs text-red-600">{{ saveError }}</span>
+                  </div>
+                  <div v-if="saveSuccess" class="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2">
+                    <svg class="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                     </svg>
-                    {{ isSaving ? 'Saving…' : 'Save Draft for Review' }}
-                  </button>
-                  <span v-if="saveSuccess" class="text-xs text-emerald-600 font-medium">Saved — visible in Saved Drafts tab</span>
-                  <span v-if="saveError" class="text-xs text-red-600">{{ saveError }}</span>
+                    <span class="text-xs text-emerald-800 font-medium">Draft added to Review Queue</span>
+                    <span class="text-xs text-emerald-600">·</span>
+                    <NuxtLink to="/review-queue" class="text-xs text-emerald-700 underline font-medium hover:text-emerald-900">Open Review Queue →</NuxtLink>
+                    <span class="text-[10px] text-emerald-500 ml-auto italic">Review Queue = internal manual review. DobryBot does not send messages.</span>
+                  </div>
                 </div>
               </div>
             </AppCard>

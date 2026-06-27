@@ -6,6 +6,10 @@ const api = useApi()
 const showSeedConfirm = ref(false)
 const refreshingRecs = ref(false)
 const dismissing = ref<string | null>(null)
+const reviewing = ref<string | null>(null)
+const actioning = ref<string | null>(null)
+const creatingOpp = ref<string | null>(null)
+const oppCreated = ref<string | null>(null)  // rec id of created opp
 
 const { data: brief, pending, error, refresh } = await useAsyncData('dashboard', () => api.getDailyBrief())
 const { data: bdStats, refresh: refreshBD } = await useAsyncData('bd-dashboard', () => api.getBDDashboard(), {
@@ -118,6 +122,43 @@ async function dismissRec(id: string) {
     // non-critical
   } finally {
     dismissing.value = null
+  }
+}
+
+async function reviewRec(id: string) {
+  reviewing.value = id
+  try {
+    await api.reviewBDRecommendation(id)
+    await refreshRecs()
+  } catch {
+    // non-critical
+  } finally {
+    reviewing.value = null
+  }
+}
+
+async function actionRec(id: string) {
+  actioning.value = id
+  try {
+    await api.actionBDRecommendation(id)
+    await refreshRecs()
+  } catch {
+    // non-critical
+  } finally {
+    actioning.value = null
+  }
+}
+
+async function createOppFromRec(id: string) {
+  creatingOpp.value = id
+  try {
+    await api.createOpportunityFromRec(id)
+    oppCreated.value = id
+    await refreshRecs()
+  } catch {
+    // non-critical
+  } finally {
+    creatingOpp.value = null
   }
 }
 </script>
@@ -549,27 +590,62 @@ async function dismissRec(id: string) {
                   <div
                     v-for="rec in topRecommendations"
                     :key="rec.id"
-                    class="flex items-start gap-2.5 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5"
+                    class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 space-y-2"
                   >
-                    <span
-                      class="mt-0.5 inline-flex flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset"
-                      :class="priorityConfig[rec.priority]?.color ?? 'bg-gray-100 text-gray-500 ring-gray-200'"
-                    >
-                      {{ priorityConfig[rec.priority]?.label ?? rec.priority }}
-                    </span>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-xs font-medium text-gray-900 truncate">{{ rec.entity_name }}</p>
-                      <p class="text-[11px] text-gray-500 leading-snug mt-0.5">{{ rec.recommended_action }}</p>
+                    <div class="flex items-start gap-2.5">
+                      <span
+                        class="mt-0.5 inline-flex flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset"
+                        :class="priorityConfig[rec.priority]?.color ?? 'bg-gray-100 text-gray-500 ring-gray-200'"
+                      >
+                        {{ priorityConfig[rec.priority]?.label ?? rec.priority }}
+                      </span>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-xs font-medium text-gray-900 truncate">{{ rec.entity_name }}</p>
+                        <p class="text-[11px] text-gray-500 leading-snug mt-0.5">{{ rec.recommended_action }}</p>
+                        <p v-if="oppCreated === rec.id" class="text-[11px] text-emerald-600 font-medium mt-0.5">
+                          Opportunity created →
+                          <NuxtLink to="/opportunities" class="underline">View Opportunities</NuxtLink>
+                        </p>
+                      </div>
+                      <button
+                        class="flex-shrink-0 text-gray-300 hover:text-gray-500 transition-colors"
+                        :disabled="dismissing === rec.id"
+                        title="Dismiss"
+                        @click="dismissRec(rec.id)"
+                      >
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </div>
-                    <button
-                      class="flex-shrink-0 text-gray-300 hover:text-gray-500 transition-colors"
-                      :disabled="dismissing === rec.id"
-                      @click="dismissRec(rec.id)"
-                    >
-                      <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                    <!-- Action row -->
+                    <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+                      <button
+                        class="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-40"
+                        :disabled="reviewing === rec.id"
+                        @click="reviewRec(rec.id)"
+                      >
+                        <span v-if="reviewing === rec.id" class="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Mark Reviewed
+                      </button>
+                      <button
+                        class="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium bg-white border border-gray-200 text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-40"
+                        :disabled="actioning === rec.id"
+                        @click="actionRec(rec.id)"
+                      >
+                        <span v-if="actioning === rec.id" class="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Mark Actioned
+                      </button>
+                      <button
+                        v-if="(rec.priority === 'high' || rec.priority === 'critical') && oppCreated !== rec.id"
+                        class="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-40"
+                        :disabled="creatingOpp === rec.id"
+                        @click="createOppFromRec(rec.id)"
+                      >
+                        <span v-if="creatingOpp === rec.id" class="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Create Opportunity
+                      </button>
+                    </div>
                   </div>
                 </template>
                 <p v-else class="text-sm text-gray-400">
