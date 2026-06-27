@@ -527,3 +527,57 @@ class BDEvaluateAllResult(BaseModel):
         "Signals evaluated locally using rule-based intelligence. "
         "No external API calls. Recommendations require explicit human review."
     )
+
+
+# ── Phase 16: Workspace Data Management ───────────────────────────────────────
+
+class BDImportHistoryEntry(BaseModel):
+    id: str = Field(default_factory=_uid)
+    import_type: str            # "companies" | "prospects" | "signals"
+    filename: str = ""
+    imported_count: int = 0
+    skipped_count: int = 0
+    duplicate_count: int = 0
+    error_count: int = 0
+    committed_at: str = Field(default_factory=_now)
+    safety_notice: str = "All data imported locally. No external APIs called."
+    local_only: bool = True
+
+
+class BDWorkspaceStatus(BaseModel):
+    total_companies: int = 0
+    total_prospects: int = 0
+    total_signals: int = 0
+    total_opportunities: int = 0
+    total_deal_packets: int = 0
+    total_outreach_drafts: int = 0
+    total_recommendations: int = 0
+    imported_companies: int = 0
+    imported_prospects: int = 0
+    imported_signals: int = 0
+    last_import_date: Optional[str] = None
+    last_activity_date: Optional[str] = None
+    icp_configured: bool = False
+    data_health_warnings: List[str] = Field(default_factory=list)
+    local_only: bool = True
+    safety_notice: str = "All workspace data is stored locally. No external APIs are called."
+
+
+class BDRestorePreviewResult(BaseModel):
+    companies_count: int = 0
+    prospects_count: int = 0
+    signals_count: int = 0
+    opportunities_count: int = 0
+    deal_packets_count: int = 0
+    outreach_drafts_count: int = 0
+    recommendations_count: int = 0
+    warnings: List[str] = Field(default_factory=list)
+    valid: bool = True
+    local_only: bool = True
+    safety_notice: str = "Preview only — no data was modified."
+
+
+class BDClearResult(BaseModel):
+    cleared: List[str] = Field(default_factory=list)
+    records_removed: int = 0
+    safety_notice: str = "All cleared data was stored locally. No external services were contacted."

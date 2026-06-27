@@ -3,18 +3,22 @@ BD OS CSV import endpoints. Local only. No external API calls.
 All data is parsed and stored on-disk. No enrichment, no scraping.
 """
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import PlainTextResponse
+from typing import List
 
 from backend.config import (
     get_bd_company_path, get_bd_prospect_path, get_bd_signal_path,
-    get_bd_activity_path,
+    get_bd_activity_path, get_bd_import_history_path,
 )
-from backend.models.bd import BDImportResult
+from backend.models.bd import BDImportResult, BDImportHistoryEntry
 from backend.services.bd_csv_import import (
     import_companies_csv, import_prospects_csv, import_signals_csv,
     COMPANIES_TEMPLATE, PROSPECTS_TEMPLATE, SIGNALS_TEMPLATE,
 )
 from backend.services.bd_activity_store import log_activity
-from fastapi.responses import PlainTextResponse
+from backend.services.bd_import_history_store import (
+    list_import_history, get_import_history_entry, record_import,
+)
 
 router = APIRouter(prefix="/bd/import", tags=["bd-import"])
 
@@ -30,12 +34,32 @@ def _validate_upload(file: UploadFile) -> None:
         )
 
 
+@router.get("/history", response_model=List[BDImportHistoryEntry])
+def get_import_history(
+    import_history_path: str = Depends(get_bd_import_history_path),
+):
+    """Return all committed CSV import records, newest first."""
+    return list_import_history(import_history_path)
+
+
+@router.get("/history/{entry_id}", response_model=BDImportHistoryEntry)
+def get_import_history_by_id(
+    entry_id: str,
+    import_history_path: str = Depends(get_bd_import_history_path),
+):
+    entry = get_import_history_entry(import_history_path, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"Import history entry '{entry_id}' not found")
+    return entry
+
+
 @router.post("/companies-csv", response_model=BDImportResult)
 async def import_companies(
     file: UploadFile = File(...),
     dry_run: bool = Query(default=True, description="Preview without committing"),
     company_path: str = Depends(get_bd_company_path),
     activity_path: str = Depends(get_bd_activity_path),
+    import_history_path: str = Depends(get_bd_import_history_path),
 ):
     """
     Import companies from a CSV file. Local only — no external API calls.
@@ -60,6 +84,14 @@ async def import_companies(
                 "skipped_count": result.skipped_count,
             },
         })
+        record_import(import_history_path, {
+            "import_type": "companies",
+            "filename": file.filename or "companies.csv",
+            "imported_count": result.imported_count,
+            "skipped_count": result.skipped_count,
+            "duplicate_count": result.duplicate_count,
+            "error_count": result.error_count,
+        })
     return result
 
 
@@ -70,6 +102,7 @@ async def import_prospects(
     prospect_path: str = Depends(get_bd_prospect_path),
     company_path: str = Depends(get_bd_company_path),
     activity_path: str = Depends(get_bd_activity_path),
+    import_history_path: str = Depends(get_bd_import_history_path),
 ):
     """
     Import prospects from a CSV file. Local only — no external API calls.
@@ -94,6 +127,14 @@ async def import_prospects(
                 "skipped_count": result.skipped_count,
             },
         })
+        record_import(import_history_path, {
+            "import_type": "prospects",
+            "filename": file.filename or "prospects.csv",
+            "imported_count": result.imported_count,
+            "skipped_count": result.skipped_count,
+            "duplicate_count": result.duplicate_count,
+            "error_count": result.error_count,
+        })
     return result
 
 
@@ -104,6 +145,7 @@ async def import_signals(
     signal_path: str = Depends(get_bd_signal_path),
     company_path: str = Depends(get_bd_company_path),
     activity_path: str = Depends(get_bd_activity_path),
+    import_history_path: str = Depends(get_bd_import_history_path),
 ):
     """
     Import signals from a CSV file. Local only — no external API calls.
@@ -127,6 +169,14 @@ async def import_signals(
                 "duplicate_count": result.duplicate_count,
                 "skipped_count": result.skipped_count,
             },
+        })
+        record_import(import_history_path, {
+            "import_type": "signals",
+            "filename": file.filename or "signals.csv",
+            "imported_count": result.imported_count,
+            "skipped_count": result.skipped_count,
+            "duplicate_count": result.duplicate_count,
+            "error_count": result.error_count,
         })
     return result
 

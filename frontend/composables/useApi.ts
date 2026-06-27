@@ -17,6 +17,10 @@ import type {
   BDOpportunityRecalculateResult,
   BDRecommendationRefreshResult,
   BDEvaluateAllResult,
+  BDImportHistoryEntry,
+  BDWorkspaceStatus,
+  BDRestorePreviewResult,
+  BDClearResult,
 } from '~/types'
 
 export const useApi = () => {
@@ -222,5 +226,19 @@ export const useApi = () => {
     },
     downloadTemplate: (type: 'companies' | 'prospects' | 'signals') =>
       `${base}/api/bd/import/templates?type=${type}`,
+    // BD OS — Import History (Phase 16)
+    getImportHistory: () => get<BDImportHistoryEntry[]>('/api/bd/import/history'),
+    // BD OS — Workspace (Phase 16)
+    getWorkspaceStatus: () => get<BDWorkspaceStatus>('/api/bd/workspace/status'),
+    backupWorkspace: () => `${base}/api/bd/workspace/backup`,
+    restorePreview: (backup: Record<string, unknown>) =>
+      post<BDRestorePreviewResult>('/api/bd/workspace/restore-preview', backup),
+    clearAllWorkspace: (confirmText: string) =>
+      post<BDClearResult>('/api/bd/workspace/clear-all', { confirm_text: confirmText }),
+    // BD OS — Exports (Phase 16)
+    exportUrl: (type: 'companies' | 'prospects' | 'signals' | 'opportunities' | 'workspace') => {
+      if (type === 'workspace') return `${base}/api/bd/export/workspace.json`
+      return `${base}/api/bd/export/${type}.csv`
+    },
   }
 }

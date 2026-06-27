@@ -513,6 +513,60 @@ export interface BDPipelineSnapshot {
 
 export type BDPipelineResponse = BDPipelineSnapshot
 
+// ── Phase 16: Workspace Data Management ──────────────────────────────────────
+
+export interface BDImportHistoryEntry {
+  id: string
+  import_type: 'companies' | 'prospects' | 'signals'
+  filename: string
+  imported_count: number
+  skipped_count: number
+  duplicate_count: number
+  error_count: number
+  committed_at: string
+  safety_notice: string
+  local_only: boolean
+}
+
+export interface BDWorkspaceStatus {
+  total_companies: number
+  total_prospects: number
+  total_signals: number
+  total_opportunities: number
+  total_deal_packets: number
+  total_outreach_drafts: number
+  total_recommendations: number
+  imported_companies: number
+  imported_prospects: number
+  imported_signals: number
+  last_import_date: string | null
+  last_activity_date: string | null
+  icp_configured: boolean
+  data_health_warnings: string[]
+  local_only: boolean
+  safety_notice: string
+}
+
+export interface BDRestorePreviewResult {
+  companies_count: number
+  prospects_count: number
+  signals_count: number
+  opportunities_count: number
+  deal_packets_count: number
+  outreach_drafts_count: number
+  recommendations_count: number
+  warnings: string[]
+  valid: boolean
+  local_only: boolean
+  safety_notice: string
+}
+
+export interface BDClearResult {
+  cleared: string[]
+  records_removed: number
+  safety_notice: string
+}
+
 // ── Phase 15: Evaluate All ────────────────────────────────────────────────────
 
 export interface BDEvaluateAllResult {
