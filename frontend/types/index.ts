@@ -513,6 +513,27 @@ export interface BDPipelineSnapshot {
 
 export type BDPipelineResponse = BDPipelineSnapshot
 
+// ── CSV Import — Phase 14 ─────────────────────────────────────────────────────
+
+export interface BDImportPreviewRow {
+  row: number
+  data: Record<string, string>
+  status: 'ok' | 'duplicate' | 'error'
+  message: string | null
+}
+
+export interface BDImportResult {
+  import_type: 'companies' | 'prospects' | 'signals'
+  dry_run: boolean
+  imported_count: number
+  skipped_count: number
+  duplicate_count: number
+  error_count: number
+  errors: string[]
+  preview_rows: BDImportPreviewRow[]
+  safety_notice: string
+}
+
 // ── Resume Editor — Phase 6 ───────────────────────────────────────────────────
 
 export type ResumeTone = 'professional' | 'executive' | 'technical' | 'concise'

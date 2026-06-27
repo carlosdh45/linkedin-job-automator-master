@@ -190,10 +190,14 @@ async function dismissRec(id: string) {
             <li class="flex items-start gap-3 rounded-lg border border-blue-200 bg-white px-4 py-3">
               <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white mt-0.5">1</span>
               <div class="flex-1 min-w-0">
-                <p class="text-xs font-semibold text-gray-900">Seed demo data</p>
-                <p class="text-[11px] text-gray-400 mt-0.5">Load 6 companies, 7 signals, 5 opportunities, and 3 deal packets with a default ICP.</p>
+                <p class="text-xs font-semibold text-gray-900">Load demo data or import your own</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">Seed 6 sample companies to explore the workflow, or import real accounts from a CSV.</p>
               </div>
-              <button class="text-[11px] text-blue-600 hover:underline flex-shrink-0 mt-0.5 font-medium" @click="showSeedConfirm = true">Seed →</button>
+              <div class="flex gap-1 flex-shrink-0 mt-0.5">
+                <button class="text-[11px] text-blue-600 hover:underline font-medium" @click="showSeedConfirm = true">Demo →</button>
+                <span class="text-[11px] text-gray-300">·</span>
+                <NuxtLink to="/import" class="text-[11px] text-blue-600 hover:underline font-medium">Import →</NuxtLink>
+              </div>
             </li>
             <li class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
               <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 mt-0.5">2</span>
@@ -206,8 +210,8 @@ async function dismissRec(id: string) {
             <li class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
               <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 mt-0.5">3</span>
               <div class="flex-1 min-w-0">
-                <p class="text-xs font-semibold text-gray-900">Review buying signals</p>
-                <p class="text-[11px] text-gray-400 mt-0.5">See hiring spikes, leadership changes, and pain point mentions detected for each account.</p>
+                <p class="text-xs font-semibold text-gray-900">Review or log buying signals</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">See hiring spikes, leadership changes, and pain points. Log new signals manually with "Add Signal".</p>
               </div>
               <NuxtLink to="/signals" class="text-[11px] text-blue-600 hover:underline flex-shrink-0 mt-0.5 font-medium">Signals →</NuxtLink>
             </li>

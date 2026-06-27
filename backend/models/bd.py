@@ -494,3 +494,24 @@ class BDRecommendationRefreshResult(BaseModel):
     opportunities_recalculated: int
     recommendations_created: int
     safety_notice: str
+
+
+# ── CSV Import ────────────────────────────────────────────────────────────────
+
+class BDImportPreviewRow(BaseModel):
+    row: int
+    data: dict
+    status: str          # "ok" | "duplicate" | "error"
+    message: Optional[str] = None
+
+
+class BDImportResult(BaseModel):
+    import_type: str     # "companies" | "prospects" | "signals"
+    dry_run: bool
+    imported_count: int
+    skipped_count: int
+    duplicate_count: int
+    error_count: int
+    errors: List[str] = Field(default_factory=list)
+    preview_rows: List[BDImportPreviewRow] = Field(default_factory=list)
+    safety_notice: str = "All data imported locally. No external APIs called."

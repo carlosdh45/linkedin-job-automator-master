@@ -1,5 +1,6 @@
 import type {
   Stats, Job, Lead, Draft, DailyBrief,
+  BDImportResult,
   CandidateProfile, ProfileUpdate,
   ResumeInfo, ResumeProfile, ResumeProfileUpdate,
   CVImportPreview, CVImportApplyRequest,
@@ -199,5 +200,16 @@ export const useApi = () => {
       post<BDRecommendation>(`/api/bd/recommendations/${id}/dismiss`),
     actionBDRecommendation: (id: string) =>
       post<BDRecommendation>(`/api/bd/recommendations/${id}/action`),
+    // BD OS — CSV Import
+    importCSV: (type: 'companies' | 'prospects' | 'signals', file: File, dryRun = true) => {
+      const form = new FormData()
+      form.append('file', file)
+      return $fetch<BDImportResult>(
+        `${base}/api/bd/import/${type}-csv?dry_run=${dryRun}`,
+        { method: 'POST', body: form },
+      )
+    },
+    downloadTemplate: (type: 'companies' | 'prospects' | 'signals') =>
+      `${base}/api/bd/import/templates?type=${type}`,
   }
 }

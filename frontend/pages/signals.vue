@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BDSignal, BDSignalEvaluationResult } from '~/types'
+import type { BDSignal, BDSignalEvaluationResult, BDCompany } from '~/types'
 
 const api = useApi()
 
@@ -8,6 +8,77 @@ const { data: signals, pending, error, refresh } = await useAsyncData<BDSignal[]
   () => api.getBDSignals(),
   { default: () => [] }
 )
+
+const { data: companies } = await useAsyncData<BDCompany[]>(
+  'bd-companies-signals',
+  () => api.getBDCompanies(),
+  { default: () => [] }
+)
+
+// ── Add Signal form ──────────────────────────────────────────────────────────
+const showAddForm = ref(false)
+const isSavingSignal = ref(false)
+const saveError = ref<string | null>(null)
+
+const newSignal = reactive({
+  company_name: '',
+  signal_type: 'hiring',
+  summary: '',
+  source: '',
+  relevance_score: 70,
+  detected_at: new Date().toISOString().slice(0, 10),
+})
+
+const signalTypes = [
+  { value: 'hiring', label: 'Hiring Signal' },
+  { value: 'funding', label: 'Funding' },
+  { value: 'leadership_change', label: 'Leadership Change' },
+  { value: 'tech_change', label: 'Tech Change' },
+  { value: 'pain_point', label: 'Pain Point' },
+  { value: 'growth', label: 'Growth Signal' },
+  { value: 'competitive', label: 'Competitive' },
+  { value: 'expansion', label: 'Expansion' },
+  { value: 'partnership', label: 'Partnership' },
+  { value: 'compliance_pressure', label: 'Compliance Pressure' },
+  { value: 'market_event', label: 'Market Event' },
+  { value: 'other', label: 'Other' },
+]
+
+function resetForm() {
+  newSignal.company_name = ''
+  newSignal.signal_type = 'hiring'
+  newSignal.summary = ''
+  newSignal.source = ''
+  newSignal.relevance_score = 70
+  newSignal.detected_at = new Date().toISOString().slice(0, 10)
+  saveError.value = null
+}
+
+async function saveSignal() {
+  if (!newSignal.company_name.trim() || !newSignal.summary.trim()) {
+    saveError.value = 'Company name and description are required.'
+    return
+  }
+  isSavingSignal.value = true
+  saveError.value = null
+  try {
+    await api.createBDSignal({
+      company_name: newSignal.company_name.trim(),
+      signal_type: newSignal.signal_type,
+      summary: newSignal.summary.trim(),
+      source: newSignal.source.trim() || undefined,
+      relevance_score: newSignal.relevance_score,
+      detected_at: newSignal.detected_at || undefined,
+    })
+    showAddForm.value = false
+    resetForm()
+    await refresh()
+  } catch {
+    saveError.value = 'Could not save signal — make sure the backend is running.'
+  } finally {
+    isSavingSignal.value = false
+  }
+}
 
 const signalTypeConfig: Record<string, { label: string; color: string; icon: string }> = {
   hiring: {
@@ -114,10 +185,122 @@ async function evaluateSignal(signal: BDSignal) {
         >
           {{ showReviewed ? 'Show unreviewed only' : 'Show all' }}
         </button>
+        <button
+          class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+          @click="showAddForm = !showAddForm; if (!showAddForm) resetForm()"
+        >
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Add Signal
+        </button>
       </template>
     </PageHeader>
 
     <div class="flex-1 p-6 space-y-4 max-w-5xl w-full mx-auto">
+      <!-- Add Signal form (inline panel) -->
+      <AppCard v-if="showAddForm">
+        <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-gray-900">Log a Market Signal</h3>
+          <p class="text-xs text-gray-400">Saved locally — no external APIs called</p>
+        </div>
+        <div class="px-5 py-4 space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Company name -->
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Company Name <span class="text-red-500">*</span></label>
+              <input
+                v-model="newSignal.company_name"
+                list="company-names-list"
+                type="text"
+                placeholder="e.g. Meridian Labs"
+                class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              />
+              <datalist id="company-names-list">
+                <option v-for="co in (companies ?? [])" :key="co.id" :value="co.name" />
+              </datalist>
+            </div>
+            <!-- Signal type -->
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Signal Type <span class="text-red-500">*</span></label>
+              <select
+                v-model="newSignal.signal_type"
+                class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              >
+                <option v-for="st in signalTypes" :key="st.value" :value="st.value">{{ st.label }}</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Description / summary -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Description <span class="text-red-500">*</span></label>
+            <textarea
+              v-model="newSignal.summary"
+              rows="3"
+              placeholder="Describe what you observed — the more context, the better the evaluation."
+              class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none"
+            />
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Source -->
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Source</label>
+              <input
+                v-model="newSignal.source"
+                type="text"
+                placeholder="e.g. LinkedIn, Job board"
+                class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              />
+            </div>
+            <!-- Relevance score -->
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">
+                Relevance Score: <span class="text-blue-600 font-bold">{{ newSignal.relevance_score }}</span>
+              </label>
+              <input
+                v-model.number="newSignal.relevance_score"
+                type="range"
+                min="1"
+                max="100"
+                class="w-full accent-blue-600"
+              />
+              <div class="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                <span>Low (1)</span><span>High (100)</span>
+              </div>
+            </div>
+            <!-- Date -->
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Observed Date</label>
+              <input
+                v-model="newSignal.detected_at"
+                type="date"
+                class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+
+          <!-- Save / cancel -->
+          <div class="flex items-center gap-3 pt-1">
+            <button
+              class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+              :disabled="isSavingSignal"
+              @click="saveSignal"
+            >
+              {{ isSavingSignal ? 'Saving…' : 'Save Signal' }}
+            </button>
+            <button
+              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              @click="showAddForm = false; resetForm()"
+            >
+              Cancel
+            </button>
+            <span v-if="saveError" class="text-xs text-red-600">{{ saveError }}</span>
+          </div>
+        </div>
+      </AppCard>
+
       <!-- Error -->
       <div v-if="error" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
         Could not load signals — make sure the backend is running.
