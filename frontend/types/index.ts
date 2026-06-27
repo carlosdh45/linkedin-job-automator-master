@@ -513,6 +513,15 @@ export interface BDPipelineSnapshot {
 
 export type BDPipelineResponse = BDPipelineSnapshot
 
+// ── Phase 15: Evaluate All ────────────────────────────────────────────────────
+
+export interface BDEvaluateAllResult {
+  evaluated_count: number
+  skipped_count: number
+  recommendations_created: number
+  safety_notice: string
+}
+
 // ── CSV Import — Phase 14 ─────────────────────────────────────────────────────
 
 export interface BDImportPreviewRow {

@@ -515,3 +515,15 @@ class BDImportResult(BaseModel):
     errors: List[str] = Field(default_factory=list)
     preview_rows: List[BDImportPreviewRow] = Field(default_factory=list)
     safety_notice: str = "All data imported locally. No external APIs called."
+
+
+# ── Phase 15: Evaluate All / Opportunity from Recommendation ──────────────────
+
+class BDEvaluateAllResult(BaseModel):
+    evaluated_count: int
+    skipped_count: int          # already evaluated
+    recommendations_created: int
+    safety_notice: str = (
+        "Signals evaluated locally using rule-based intelligence. "
+        "No external API calls. Recommendations require explicit human review."
+    )
