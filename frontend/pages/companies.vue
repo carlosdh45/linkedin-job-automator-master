@@ -37,7 +37,7 @@ const scoreLabelColor: Record<string, string> = {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
       title="Companies"
-      :subtitle="pending ? 'Loading…' : `${filtered.length} of ${(companies ?? []).length} target companies`"
+      :subtitle="pending ? 'Loading…' : `${filtered.length} of ${(companies ?? []).length} target accounts — scored by pain points, signals, and ICP fit`"
     />
 
     <div class="flex-1 p-6 space-y-4 max-w-6xl w-full mx-auto">
@@ -135,8 +135,9 @@ const scoreLabelColor: Record<string, string> = {
                 </td>
               </tr>
               <tr v-if="!filtered.length && !pending">
-                <td colspan="7" class="py-10 text-center text-sm text-gray-400">
-                  No companies yet — seed demo data or add companies via the API.
+                <td colspan="7" class="py-12 text-center">
+                  <p class="text-sm text-gray-400 font-medium">No companies match this filter.</p>
+                  <p class="text-xs text-gray-300 mt-1">Load demo data from the Command Center or switch to "All" to see every account.</p>
                 </td>
               </tr>
             </tbody>

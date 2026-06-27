@@ -4,7 +4,7 @@ import type { Draft, BDOutreachDraft } from '~/types'
 const api = useApi()
 const reviewCount = useReviewCount()
 
-const activeQueueTab = ref<'jobs' | 'bd'>('jobs')
+const activeQueueTab = ref<'jobs' | 'bd'>('bd')
 
 const expanded = ref(new Set<number>())
 const processingId = ref<number | null>(null)
@@ -132,8 +132,8 @@ async function doResearch(note: string) {
 <template>
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
-      :title="`Review Queue`"
-      :subtitle="`${drafts.length} job draft${drafts.length !== 1 ? 's' : ''} · ${pendingBDDrafts.length} BD outreach draft${pendingBDDrafts.length !== 1 ? 's' : ''} pending review`"
+      title="Review Queue"
+      :subtitle="`${pendingBDDrafts.length} BD outreach draft${pendingBDDrafts.length !== 1 ? 's' : ''} pending review · ${drafts.length} legacy job draft${drafts.length !== 1 ? 's' : ''} — approve means ready for manual execution, not sent`"
     >
       <template #actions>
         <button
@@ -169,19 +169,19 @@ async function doResearch(note: string) {
       <div class="flex gap-1 border-b border-gray-200">
         <button
           class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
-          :class="activeQueueTab === 'jobs' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
-          @click="activeQueueTab = 'jobs'"
-        >
-          Job Outreach
-          <span v-if="drafts.length" class="ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-blue-50 text-blue-700">{{ drafts.length }}</span>
-        </button>
-        <button
-          class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
           :class="activeQueueTab === 'bd' ? 'border-violet-600 text-violet-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
           @click="activeQueueTab = 'bd'"
         >
           BD Outreach
           <span v-if="pendingBDDrafts.length" class="ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-violet-50 text-violet-700">{{ pendingBDDrafts.length }}</span>
+        </button>
+        <button
+          class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+          :class="activeQueueTab === 'jobs' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
+          @click="activeQueueTab = 'jobs'"
+        >
+          Legacy Job Drafts
+          <span v-if="drafts.length" class="ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-blue-50 text-blue-700">{{ drafts.length }}</span>
         </button>
       </div>
 
@@ -336,7 +336,7 @@ async function doResearch(note: string) {
 
         <template v-else>
           <AppCard v-if="!pendingBDDrafts.length">
-            <EmptyState title="No BD drafts pending" message="Generate and save outreach drafts in Message Studio to review them here.">
+            <EmptyState title="No BD drafts pending review" message="Generate a draft in Message Studio → save it → it will appear here for approval. Approving marks it ready for manual execution — nothing sends automatically.">
               <template #icon>
                 <svg class="h-6 w-6 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />

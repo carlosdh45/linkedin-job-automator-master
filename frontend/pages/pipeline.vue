@@ -39,7 +39,7 @@ const scoreLabelColor: Record<string, string> = {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
       title="Pipeline"
-      :subtitle="pending ? 'Loading…' : `${totalDeals} deals across ${stages.length} stages`"
+      :subtitle="pending ? 'Loading…' : `${totalDeals} active deal${totalDeals !== 1 ? 's' : ''} across ${stages.length} stages — advance opportunities as conversations progress`"
     >
       <template #actions>
         <div class="flex gap-1 rounded-lg border border-gray-200 bg-white p-0.5">
@@ -127,7 +127,7 @@ const scoreLabelColor: Record<string, string> = {
                 v-if="stage.deals.length === 0"
                 class="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-center"
               >
-                <p class="text-xs text-gray-400">No deals yet</p>
+                <p class="text-xs text-gray-400">No deals at this stage</p>
               </div>
             </div>
           </div>
@@ -176,7 +176,10 @@ const scoreLabelColor: Record<string, string> = {
                     </tr>
                   </template>
                   <tr v-if="totalDeals === 0">
-                    <td colspan="6" class="py-10 text-center text-sm text-gray-400">No deals in pipeline yet — seed demo data to get started.</td>
+                    <td colspan="6" class="py-12 text-center">
+                      <p class="text-sm text-gray-400 font-medium">No deals in pipeline yet.</p>
+                      <p class="text-xs text-gray-300 mt-1">Load demo data from the Command Center, or move opportunities to active stages.</p>
+                    </td>
                   </tr>
                 </tbody>
               </table>

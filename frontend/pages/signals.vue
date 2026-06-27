@@ -102,7 +102,7 @@ async function evaluateSignal(signal: BDSignal) {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
       title="Signals"
-      :subtitle="pending ? 'Loading…' : `${filtered.length} signals — ${evaluatedCount} evaluated`"
+      :subtitle="pending ? 'Loading…' : `${filtered.length} buying signals — ${evaluatedCount} evaluated · Hiring, leadership changes, pain points, and more`"
     >
       <template #actions>
         <button
@@ -241,7 +241,8 @@ async function evaluateSignal(signal: BDSignal) {
         </AppCard>
 
         <div v-if="!filtered.length" class="py-16 text-center">
-          <p class="text-sm text-gray-400">No signals match the current filter.</p>
+          <p class="text-sm text-gray-400 font-medium">No signals match the current filter.</p>
+          <p class="text-xs text-gray-300 mt-1">Try "All Types" or load demo data from the Command Center to see example signals.</p>
         </div>
       </div>
     </div>

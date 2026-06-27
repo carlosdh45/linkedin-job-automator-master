@@ -147,12 +147,17 @@ async function dismissRec(id: string) {
     </PageHeader>
 
     <div class="flex-1 p-6 space-y-6 max-w-7xl w-full mx-auto">
-      <!-- Safety banner -->
-      <div class="flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
-        <svg class="h-4 w-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-        </svg>
-        <span class="text-sm text-emerald-700 font-medium">All outreach drafts require explicit human approval — DobryBot never sends automatically.</span>
+      <!-- Hero value prop + safety strip -->
+      <div class="rounded-xl border border-gray-200 bg-white px-5 py-4 flex items-start justify-between gap-6">
+        <div>
+          <p class="text-base font-semibold text-gray-900 leading-snug">Less noise. More qualified opportunities.</p>
+          <p class="text-sm text-gray-500 mt-1 leading-relaxed">DobryBot surfaces buying signals, scores your ICP, and prepares deal intelligence for human-led outreach — so you reach the right prospect with the right context before you ever say hello.</p>
+        </div>
+        <div class="hidden xl:flex flex-col items-end gap-2 flex-shrink-0 text-right">
+          <span class="inline-flex items-center gap-1.5 text-xs text-gray-400"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>100% local — no external APIs</span>
+          <span class="inline-flex items-center gap-1.5 text-xs text-gray-400"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>No AI calls — rule-based scoring</span>
+          <span class="inline-flex items-center gap-1.5 text-xs text-gray-400"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>Human approval required — never auto-sends</span>
+        </div>
       </div>
 
       <LoadingSpinner v-if="pending" label="Loading command center…" />
@@ -216,7 +221,7 @@ async function dismissRec(id: string) {
               </div>
               <div v-if="!brief.top_jobs.length" class="py-10 text-center">
                 <p class="text-sm text-gray-400">No qualified opportunities yet.</p>
-                <p class="text-xs text-gray-300 mt-1">Add prospects and companies to start scoring.</p>
+                <p class="text-xs text-gray-300 mt-1">Load demo data to see the full workflow, or add companies and prospects via the BD pages.</p>
               </div>
               <table v-else class="app-table">
                 <thead>
@@ -252,7 +257,7 @@ async function dismissRec(id: string) {
               </div>
               <div v-if="!brief.top_leads.length" class="py-10 text-center">
                 <p class="text-sm text-gray-400">No high signal prospects yet.</p>
-                <p class="text-xs text-gray-300 mt-1">Import contacts or add prospects to start tracking signals.</p>
+                <p class="text-xs text-gray-300 mt-1">Add prospects under Intelligence → Prospects, or load demo data to explore the workflow.</p>
               </div>
               <table v-else class="app-table">
                 <thead>
@@ -297,8 +302,8 @@ async function dismissRec(id: string) {
                 <NuxtLink to="/companies" class="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">View all →</NuxtLink>
               </div>
               <div v-if="!companiesWithPainPoints.length" class="px-5 py-8 text-center">
-                <p class="text-sm text-gray-400">No companies with pain points yet.</p>
-                <p class="text-xs text-gray-300 mt-1">Add companies and tag their pain points to surface them here.</p>
+                <p class="text-sm text-gray-400">No companies with detected pain points yet.</p>
+                <p class="text-xs text-gray-300 mt-1">Load demo data or add companies with tagged pain points to surface them here.</p>
               </div>
               <table v-else class="app-table">
                 <thead>
@@ -363,7 +368,7 @@ async function dismissRec(id: string) {
                     </li>
                   </ol>
                 </template>
-                <p v-else class="text-sm text-gray-400">No actions suggested — add companies and prospects to get started.</p>
+                <p v-else class="text-sm text-gray-400">No actions suggested yet — load demo data or add companies and prospects to get started.</p>
               </div>
             </AppCard>
 
@@ -411,9 +416,9 @@ async function dismissRec(id: string) {
                     </span>
                   </div>
                 </template>
-                <p v-else class="text-sm text-gray-400">No active pipeline deals yet.</p>
+                <p v-else class="text-sm text-gray-400">No active deals in pipeline yet.</p>
                 <p class="text-xs text-gray-400 pt-1 border-t border-gray-100">
-                  Move opportunities through stages on the <NuxtLink to="/pipeline" class="text-blue-600 hover:underline">Pipeline page</NuxtLink>
+                  Advance opportunities through stages on the <NuxtLink to="/pipeline" class="text-blue-600 hover:underline">Pipeline page</NuxtLink>
                 </p>
               </div>
             </AppCard>
@@ -423,7 +428,7 @@ async function dismissRec(id: string) {
               <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
                 <div>
                   <h2 class="text-sm font-semibold text-gray-900">Signal Intelligence</h2>
-                  <p class="text-xs text-gray-400 mt-0.5">Rule-based recommendations for your review</p>
+                  <p class="text-xs text-gray-400 mt-0.5">ICP-aware recommendations — local scoring, no AI calls</p>
                 </div>
                 <button
                   class="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
@@ -484,11 +489,11 @@ async function dismissRec(id: string) {
                 </template>
                 <p v-else class="text-sm text-gray-400">
                   No new recommendations.
-                  <button class="text-blue-600 hover:underline ml-1" @click="runRefresh">Run refresh</button>
-                  to evaluate signals and opportunities.
+                  <button class="text-blue-600 hover:underline ml-1" @click="runRefresh">Run signal refresh</button>
+                  to evaluate signals and surface opportunities.
                 </p>
                 <p class="text-[11px] text-gray-400 border-t border-gray-100 pt-2">
-                  All recommendations require manual action — DobryBot never sends automatically.
+                  Recommendations require your explicit action — DobryBot never reaches out automatically.
                 </p>
               </div>
             </AppCard>

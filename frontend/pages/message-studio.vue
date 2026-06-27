@@ -213,6 +213,10 @@ async function flagResearch(id: string) {
                   <input v-model="draftContext.contact" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400" />
                 </div>
                 <div>
+                  <label class="block text-xs font-semibold text-gray-700 mb-1">Contact Role</label>
+                  <input v-model="draftContext.role" type="text" placeholder="e.g. VP of Engineering, CTO" class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                </div>
+                <div>
                   <label class="block text-xs font-semibold text-gray-700 mb-1">Pain Point</label>
                   <textarea v-model="draftContext.painPoint" rows="2" class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none" />
                 </div>
@@ -244,8 +248,9 @@ async function flagResearch(id: string) {
                 <p class="text-xs text-gray-400 mt-0.5">Rule-based local template — no AI, no external calls</p>
               </div>
 
-              <div v-if="!displayDraft" class="px-5 py-12 text-center text-sm text-gray-400">
-                Fill in context and click "Generate Draft" to create a local template draft.
+              <div v-if="!displayDraft" class="px-5 py-12 text-center">
+                <p class="text-sm text-gray-400 font-medium">Draft preview will appear here.</p>
+                <p class="text-xs text-gray-300 mt-1.5">Fill in the context panel and click "Generate Draft" to create a locally-templated, personalized outreach draft.</p>
               </div>
               <div v-else class="px-5 py-4">
                 <div v-if="generatedSubject" class="mb-3 text-xs font-medium text-gray-500 border-b border-gray-100 pb-2">
@@ -277,8 +282,8 @@ async function flagResearch(id: string) {
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
               </svg>
               <div>
-                <p class="text-sm font-medium text-emerald-800">Human-in-the-loop — always</p>
-                <p class="text-xs text-emerald-700 mt-0.5">Drafts are generated locally using rule-based templates. No AI calls. No external APIs. DobryBot does not send or post anything automatically. All outreach requires your explicit manual approval before execution.</p>
+                <p class="text-sm font-medium text-emerald-800">Prepared for manual review — never sent automatically</p>
+                <p class="text-xs text-emerald-700 mt-0.5">Drafts are generated locally using rule-based templates. No AI calls, no external APIs. Save to Review Queue → approve there → execute manually. DobryBot never sends or posts anything on your behalf.</p>
               </div>
             </div>
           </div>
@@ -291,9 +296,9 @@ async function flagResearch(id: string) {
 
         <div v-else-if="!savedDrafts?.length">
           <AppCard>
-            <div class="px-5 py-10 text-center">
-              <p class="text-sm text-gray-400">No saved drafts yet.</p>
-              <p class="text-xs text-gray-300 mt-1">Generate a draft in the Compose tab, then click "Save Draft for Review".</p>
+            <div class="px-5 py-12 text-center">
+              <p class="text-sm text-gray-400 font-medium">No saved drafts yet.</p>
+              <p class="text-xs text-gray-300 mt-1.5">Compose a draft in the Compose tab and click "Save Draft for Review" — it will appear here and in the Review Queue.</p>
             </div>
           </AppCard>
         </div>

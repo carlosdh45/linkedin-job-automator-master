@@ -19,8 +19,24 @@ const stageFilters = [
   { value: 'identified', label: 'Identified' },
   { value: 'researched', label: 'Researched' },
   { value: 'qualified', label: 'Qualified' },
+  { value: 'outreach_ready', label: 'Outreach Ready' },
+  { value: 'in_conversation', label: 'In Conversation' },
   { value: 'engaged', label: 'Engaged' },
 ]
+
+const stageLabel: Record<string, string> = {
+  identified: 'Identified',
+  researched: 'Researched',
+  qualified: 'Qualified',
+  outreach_ready: 'Outreach Ready',
+  in_conversation: 'In Conversation',
+  proposal: 'Proposal',
+  engaged: 'Engaged',
+  deal_packet: 'Deal Packet',
+  active: 'Active',
+  won: 'Won',
+  lost: 'Lost',
+}
 
 const scoreFilters = [
   { value: 'all', label: 'All Scores' },
@@ -46,9 +62,14 @@ const stageColor: Record<string, string> = {
   identified: 'bg-gray-100 text-gray-600',
   researched: 'bg-blue-50 text-blue-700',
   qualified: 'bg-violet-50 text-violet-700',
+  outreach_ready: 'bg-indigo-50 text-indigo-700',
+  in_conversation: 'bg-amber-50 text-amber-700',
+  proposal: 'bg-orange-50 text-orange-700',
   engaged: 'bg-amber-50 text-amber-700',
   deal_packet: 'bg-orange-50 text-orange-700',
   active: 'bg-emerald-50 text-emerald-700',
+  won: 'bg-emerald-100 text-emerald-800',
+  lost: 'bg-red-50 text-red-600',
 }
 
 function scoreChangeColor(change: number | null): string {
@@ -82,7 +103,7 @@ async function recalculate(opp: BDOpportunity) {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
       title="Opportunities"
-      :subtitle="pending ? 'Loading…' : `${filtered.length} qualified opportunities tracked`"
+      :subtitle="pending ? 'Loading…' : `${filtered.length} BD opportunities — ranked by ICP fit, pain point match, and signal contribution`"
     />
 
     <div class="flex-1 p-6 space-y-4 max-w-6xl w-full mx-auto">
@@ -169,7 +190,7 @@ async function recalculate(opp: BDOpportunity) {
                     class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
                     :class="stageColor[opp.stage] ?? 'bg-gray-100 text-gray-600'"
                   >
-                    {{ opp.stage }}
+                    {{ stageLabel[opp.stage] ?? opp.stage }}
                   </span>
                 </div>
                 <p v-if="opp.contact_name" class="text-xs text-gray-500 mt-0.5">{{ opp.contact_name }}</p>
@@ -239,7 +260,8 @@ async function recalculate(opp: BDOpportunity) {
         </AppCard>
 
         <div v-if="!filtered.length" class="py-16 text-center">
-          <p class="text-sm text-gray-400">No opportunities match the current filter.</p>
+          <p class="text-sm text-gray-400 font-medium">No opportunities match the current filter.</p>
+          <p class="text-xs text-gray-300 mt-1">Try "All Stages" or load demo data from the Command Center.</p>
         </div>
       </div>
     </div>

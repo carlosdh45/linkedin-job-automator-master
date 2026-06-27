@@ -84,7 +84,7 @@ const scoringWeightKeys = computed(() =>
 
 <template>
   <div class="flex-1 flex flex-col overflow-y-auto">
-    <PageHeader title="Settings" subtitle="Configuration and ICP scoring criteria" />
+    <PageHeader title="Settings" subtitle="ICP scoring criteria and system configuration — controls local opportunity scoring and outreach quality" />
 
     <div class="flex-1 p-6 space-y-6 max-w-2xl w-full mx-auto">
       <!-- API Connection -->
@@ -126,7 +126,7 @@ const scoringWeightKeys = computed(() =>
       <AppCard>
         <div class="px-5 py-3.5 border-b border-gray-100">
           <h3 class="text-sm font-semibold text-gray-900">ICP Configuration</h3>
-          <p class="text-xs text-gray-500 mt-0.5">Ideal Customer Profile criteria — affects local opportunity scoring. Stored in <code class="bg-gray-100 px-1 rounded text-xs font-mono">data/bd_icp_config.json</code>.</p>
+          <p class="text-xs text-gray-500 mt-0.5">Ideal Customer Profile — defines who you're targeting. Drives local opportunity scoring and signal prioritization. No external calls. Stored in <code class="bg-gray-100 px-1 rounded text-xs font-mono">data/bd_icp_config.json</code>.</p>
         </div>
         <div class="px-5 py-4 space-y-5">
           <!-- Target industries -->
@@ -227,20 +227,20 @@ const scoringWeightKeys = computed(() =>
       <!-- Account -->
       <AppCard>
         <div class="px-5 py-3.5 border-b border-gray-100">
-          <h3 class="text-sm font-semibold text-gray-900">Account</h3>
-          <p class="text-xs text-gray-500 mt-0.5">Authentication is not yet implemented.</p>
+          <h3 class="text-sm font-semibold text-gray-900">User</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Currently running as a local single-user instance.</p>
         </div>
         <div class="px-5 py-4 flex items-center gap-4">
-          <div class="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <div class="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+            <svg class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
             </svg>
           </div>
           <div>
             <p class="text-sm font-medium text-gray-700">CorosDev Internal</p>
-            <p class="text-xs text-gray-400">carlos@corosdev.com · Auth coming in a future phase</p>
+            <p class="text-xs text-gray-400">Local instance — all data is stored on your machine</p>
           </div>
-          <span class="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium flex-shrink-0">Placeholder</span>
+          <span class="ml-auto text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full font-medium flex-shrink-0">Local</span>
         </div>
       </AppCard>
 

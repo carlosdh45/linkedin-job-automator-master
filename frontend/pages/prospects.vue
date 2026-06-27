@@ -37,7 +37,7 @@ const scoreLabelColor: Record<string, string> = {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
       title="Prospects"
-      :subtitle="pending ? 'Loading…' : `${filtered.length} of ${(prospects ?? []).length} decision makers`"
+      :subtitle="pending ? 'Loading…' : `${filtered.length} of ${(prospects ?? []).length} decision-makers — scored by signal strength, seniority, and recommended outreach angle`"
     />
 
     <div class="flex-1 p-6 space-y-4 max-w-6xl w-full mx-auto">
@@ -115,8 +115,9 @@ const scoreLabelColor: Record<string, string> = {
                 </td>
               </tr>
               <tr v-if="!filtered.length && !pending">
-                <td colspan="6" class="py-10 text-center text-sm text-gray-400">
-                  No prospects yet — seed demo data or add prospects via the API.
+                <td colspan="6" class="py-12 text-center">
+                  <p class="text-sm text-gray-400 font-medium">No prospects match this filter.</p>
+                  <p class="text-xs text-gray-300 mt-1">Load demo data from the Command Center or switch to "All" to see every prospect.</p>
                 </td>
               </tr>
             </tbody>

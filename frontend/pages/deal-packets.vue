@@ -41,7 +41,7 @@ function checklist_done(pkt: BDDealPacket): number {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <PageHeader
       title="Deal Packets"
-      :subtitle="pending ? 'Loading…' : `${(packets ?? []).length} deal packets — comprehensive BD briefings for each engagement`"
+      :subtitle="pending ? 'Loading…' : `${(packets ?? []).length} deal packets — company context, pain points, value prop, and outreach draft in one briefing`"
     />
 
     <div class="flex-1 p-6 space-y-4 max-w-5xl w-full mx-auto">
@@ -145,7 +145,8 @@ function checklist_done(pkt: BDDealPacket): number {
         </AppCard>
 
         <div v-if="!filtered.length" class="py-16 text-center">
-          <p class="text-sm text-gray-400">No deal packets match the current filter.</p>
+          <p class="text-sm text-gray-400 font-medium">No deal packets match the current filter.</p>
+          <p class="text-xs text-gray-300 mt-1">Generate a deal packet from an opportunity, or load demo data from the Command Center.</p>
         </div>
       </div>
     </div>
