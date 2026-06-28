@@ -37,6 +37,7 @@ def create_prospect_endpoint(data: BDProspectCreate, path: str = Depends(get_bd_
     )
     payload["opportunity_score"] = score
     payload["score_label"] = label
+    payload["source"] = "manual"
     return create_prospect(path, payload)
 
 

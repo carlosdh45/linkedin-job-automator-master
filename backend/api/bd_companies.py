@@ -50,6 +50,7 @@ def create_company_endpoint(data: BDCompanyCreate, path: str = Depends(get_bd_co
     )
     payload["opportunity_score"] = score
     payload["score_label"] = label
+    payload["source"] = "manual"
     return create_company(path, payload)
 
 
@@ -93,6 +94,7 @@ def evaluate_company_endpoint(
     recs, flags = _evaluate_company(company, signals, pain_points, opportunities, icp_config)
 
     for rec in recs:
+        rec["source"] = "generated"
         create_recommendation(recommendation_path, rec)
 
     # Recompute score with current signal and pain-point counts

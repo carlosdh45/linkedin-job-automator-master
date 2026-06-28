@@ -230,6 +230,7 @@ def import_companies_csv(
             "notes": "\n".join(notes_parts),
             "opportunity_score": score,
             "score_label": label,
+            "source": "imported",
         }
 
         if not dry_run:
@@ -370,6 +371,7 @@ def import_prospects_csv(
             "signal_count": 0,
             "status": "identified",
             "notes": "\n".join(notes_parts),
+            "source": "imported",
         }
 
         if not dry_run:
@@ -506,6 +508,7 @@ def import_signals_csv(
             "relevance_score": relevance_score,
             "detected_at": detected_at,
             "reviewed": False,
+            "data_source": "imported",
         }
 
         if not dry_run:

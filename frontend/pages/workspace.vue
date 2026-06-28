@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BDWorkspaceStatus, BDImportHistoryEntry, BDRestorePreviewResult, BDClearResult } from '~/types'
+import type { BDWorkspaceStatus, BDImportHistoryEntry, BDRestorePreviewResult, BDRestoreResult, BDClearResult } from '~/types'
 
 const api = useApi()
 
@@ -11,11 +11,16 @@ const loadingStatus = ref(true)
 const loadingHistory = ref(true)
 const error = ref('')
 
-// Restore preview
+// Restore
 const restoreFile = ref<File | null>(null)
+const parsedBackup = ref<Record<string, unknown> | null>(null)
 const restorePreviewResult = ref<BDRestorePreviewResult | null>(null)
+const restoreResult = ref<BDRestoreResult | null>(null)
 const restoringPreview = ref(false)
+const restoring = ref(false)
+const restoreConfirmText = ref('')
 const restoreError = ref('')
+const RESTORE_CONFIRM = 'RESTORE DOBRYBOT WORKSPACE'
 
 // Clear all
 const clearConfirmText = ref('')
@@ -23,6 +28,20 @@ const clearResult = ref<BDClearResult | null>(null)
 const clearing = ref(false)
 const clearError = ref('')
 const CLEAR_CONFIRM = 'CLEAR DOBRYBOT WORKSPACE'
+
+// Clear demo
+const clearDemoConfirmText = ref('')
+const clearDemoResult = ref<BDClearResult | null>(null)
+const clearingDemo = ref(false)
+const clearDemoError = ref('')
+const CLEAR_DEMO_CONFIRM = 'CLEAR DEMO DATA'
+
+// Clear imported
+const clearImportedConfirmText = ref('')
+const clearImportedResult = ref<BDClearResult | null>(null)
+const clearingImported = ref(false)
+const clearImportedError = ref('')
+const CLEAR_IMPORTED_CONFIRM = 'CLEAR IMPORTED DATA'
 
 // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -62,32 +81,23 @@ const totalRecords = computed(() => {
   )
 })
 
-const totalImported = computed(() => {
-  if (!status.value) return 0
-  return (
-    status.value.imported_companies +
-    status.value.imported_prospects +
-    status.value.imported_signals
-  )
+const sourceBreakdownEntries = computed(() => {
+  if (!status.value?.source_breakdown) return []
+  const order = ['demo', 'imported', 'manual', 'generated', 'legacy']
+  const colors: Record<string, string> = {
+    demo: 'bg-violet-100 text-violet-700',
+    imported: 'bg-blue-100 text-blue-700',
+    manual: 'bg-emerald-100 text-emerald-700',
+    generated: 'bg-amber-100 text-amber-700',
+    legacy: 'bg-gray-100 text-gray-600',
+  }
+  const bd = status.value.source_breakdown
+  const keys = [...new Set([...order, ...Object.keys(bd)])].filter(k => bd[k] > 0)
+  return keys.map(k => ({ key: k, count: bd[k], color: colors[k] ?? 'bg-gray-100 text-gray-600' }))
 })
 
-const hasRealData = computed(() => totalImported.value > 0)
-
-const dataBadges = computed(() => {
-  if (!status.value) return []
-  const badges: { label: string; color: string; count: number }[] = []
-  if (totalImported.value > 0)
-    badges.push({ label: 'Imported', color: 'blue', count: totalImported.value })
-  const manualApprox = Math.max(
-    0,
-    status.value.total_companies + status.value.total_prospects + status.value.total_signals - totalImported.value
-  )
-  if (manualApprox > 0)
-    badges.push({ label: 'Manual / Demo', color: 'violet', count: manualApprox })
-  if (status.value.total_opportunities > 0)
-    badges.push({ label: 'Generated', color: 'emerald', count: status.value.total_opportunities })
-  return badges
-})
+const hasImportedData = computed(() => (status.value?.source_breakdown?.imported ?? 0) > 0)
+const hasDemoData = computed(() => (status.value?.source_breakdown?.demo ?? 0) > 0)
 
 // ── Restore preview ────────────────────────────────────────────────────────
 
@@ -95,7 +105,10 @@ function onRestoreFileChange(event: Event) {
   const target = event.target as HTMLInputElement
   restoreFile.value = target.files?.[0] ?? null
   restorePreviewResult.value = null
+  restoreResult.value = null
+  parsedBackup.value = null
   restoreError.value = ''
+  restoreConfirmText.value = ''
 }
 
 async function runRestorePreview() {
@@ -103,14 +116,32 @@ async function runRestorePreview() {
   restoringPreview.value = true
   restoreError.value = ''
   restorePreviewResult.value = null
+  restoreResult.value = null
   try {
     const text = await restoreFile.value.text()
     const parsed = JSON.parse(text)
+    parsedBackup.value = parsed
     restorePreviewResult.value = await api.restorePreview(parsed)
   } catch (e: unknown) {
     restoreError.value = e instanceof Error ? e.message : 'Failed to preview restore file'
   } finally {
     restoringPreview.value = false
+  }
+}
+
+async function runRestore() {
+  if (!parsedBackup.value || restoreConfirmText.value !== RESTORE_CONFIRM) return
+  restoring.value = true
+  restoreError.value = ''
+  restoreResult.value = null
+  try {
+    restoreResult.value = await api.restoreWorkspace(parsedBackup.value, restoreConfirmText.value, false)
+    restoreConfirmText.value = ''
+    await loadAll()
+  } catch (e: unknown) {
+    restoreError.value = e instanceof Error ? e.message : 'Failed to restore workspace'
+  } finally {
+    restoring.value = false
   }
 }
 
@@ -129,6 +160,42 @@ async function clearAll() {
     clearError.value = e instanceof Error ? e.message : 'Failed to clear workspace'
   } finally {
     clearing.value = false
+  }
+}
+
+// ── Clear demo ─────────────────────────────────────────────────────────────
+
+async function clearDemo() {
+  if (clearDemoConfirmText.value !== CLEAR_DEMO_CONFIRM) return
+  clearingDemo.value = true
+  clearDemoError.value = ''
+  clearDemoResult.value = null
+  try {
+    clearDemoResult.value = await api.clearDemoData(clearDemoConfirmText.value)
+    clearDemoConfirmText.value = ''
+    await loadAll()
+  } catch (e: unknown) {
+    clearDemoError.value = e instanceof Error ? e.message : 'Failed to clear demo data'
+  } finally {
+    clearingDemo.value = false
+  }
+}
+
+// ── Clear imported ─────────────────────────────────────────────────────────
+
+async function clearImported() {
+  if (clearImportedConfirmText.value !== CLEAR_IMPORTED_CONFIRM) return
+  clearingImported.value = true
+  clearImportedError.value = ''
+  clearImportedResult.value = null
+  try {
+    clearImportedResult.value = await api.clearImportedData(clearImportedConfirmText.value)
+    clearImportedConfirmText.value = ''
+    await loadAll()
+  } catch (e: unknown) {
+    clearImportedError.value = e instanceof Error ? e.message : 'Failed to clear imported data'
+  } finally {
+    clearingImported.value = false
   }
 }
 
@@ -233,32 +300,29 @@ function importTypeBadge(type: string): string {
         </div>
       </section>
 
-      <!-- ── Demo vs Real Data ────────────────────────────────────────────── -->
+      <!-- ── Source Breakdown ────────────────────────────────────────────── -->
       <section v-if="status">
         <h2 class="text-sm font-semibold text-gray-700 mb-3">Data Sources</h2>
         <div class="rounded-xl border border-gray-200 bg-white px-5 py-4">
-          <div v-if="dataBadges.length === 0" class="text-sm text-gray-400">No data in workspace yet.</div>
-          <div v-else class="flex flex-wrap gap-2 mb-3">
-            <span
-              v-for="badge in dataBadges"
-              :key="badge.label"
-              class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
-              :class="{
-                'bg-blue-100 text-blue-700': badge.color === 'blue',
-                'bg-violet-100 text-violet-700': badge.color === 'violet',
-                'bg-emerald-100 text-emerald-700': badge.color === 'emerald',
-              }"
-            >
-              {{ badge.label }}
-              <span class="font-bold">{{ badge.count }}</span>
-            </span>
-          </div>
-          <div class="text-xs text-gray-500 space-y-0.5">
-            <div v-if="status.imported_companies > 0">Imported companies: {{ status.imported_companies }}</div>
-            <div v-if="status.imported_prospects > 0">Imported prospects: {{ status.imported_prospects }}</div>
-            <div v-if="status.imported_signals > 0">Imported signals: {{ status.imported_signals }}</div>
-            <div v-if="!hasRealData" class="text-amber-600 font-medium">
-              No CSV imports detected. Data may be demo or manually entered. Use Import Data to bring in real data.
+          <div v-if="sourceBreakdownEntries.length === 0" class="text-sm text-gray-400">No data in workspace yet.</div>
+          <div v-else>
+            <div class="flex flex-wrap gap-2 mb-3">
+              <span
+                v-for="entry in sourceBreakdownEntries"
+                :key="entry.key"
+                class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold capitalize"
+                :class="entry.color"
+              >
+                {{ entry.key }}
+                <span class="font-bold">{{ entry.count }}</span>
+              </span>
+            </div>
+            <div class="text-xs text-gray-500 space-y-0.5">
+              <div><span class="font-medium">demo</span> — seeded demo data</div>
+              <div><span class="font-medium">imported</span> — brought in via CSV import</div>
+              <div><span class="font-medium">manual</span> — created manually in the UI</div>
+              <div><span class="font-medium">generated</span> — system-created (recommendations, deal packets)</div>
+              <div v-if="(status.source_breakdown?.legacy ?? 0) > 0"><span class="font-medium">legacy</span> — existing records without source tracking</div>
             </div>
           </div>
         </div>
@@ -409,32 +473,39 @@ function importTypeBadge(type: string): string {
         </div>
       </section>
 
-      <!-- ── Restore Preview ──────────────────────────────────────────────── -->
+      <!-- ── Restore Workspace ───────────────────────────────────────────── -->
       <section>
-        <h2 class="text-sm font-semibold text-gray-700 mb-3">Restore Preview</h2>
-        <div class="rounded-xl border border-gray-200 bg-white px-5 py-4 space-y-3">
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">Restore Workspace</h2>
+        <div class="rounded-xl border border-gray-200 bg-white px-5 py-4 space-y-4">
           <p class="text-sm text-gray-600">
-            Upload a backup file to preview what it contains. No data is modified.
+            Upload a backup file to preview and restore. Use Preview first. Restoring replaces all current data.
+            Local only — no external services contacted.
           </p>
-          <input
-            type="file"
-            accept=".json"
-            class="block text-sm text-gray-600 file:mr-3 file:rounded-lg file:border file:border-gray-200 file:bg-gray-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-gray-700 hover:file:bg-gray-100"
-            @change="onRestoreFileChange"
-          />
-          <button
-            v-if="restoreFile"
-            :disabled="restoringPreview"
-            @click="runRestorePreview"
-            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {{ restoringPreview ? 'Previewing…' : 'Preview Backup' }}
-          </button>
+
+          <div class="space-y-2">
+            <input
+              type="file"
+              accept=".json"
+              class="block text-sm text-gray-600 file:mr-3 file:rounded-lg file:border file:border-gray-200 file:bg-gray-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-gray-700 hover:file:bg-gray-100"
+              @change="onRestoreFileChange"
+            />
+            <button
+              v-if="restoreFile"
+              :disabled="restoringPreview"
+              @click="runRestorePreview"
+              class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {{ restoringPreview ? 'Previewing…' : 'Preview Backup' }}
+            </button>
+          </div>
+
           <div v-if="restoreError" class="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
             {{ restoreError }}
           </div>
-          <div v-if="restorePreviewResult" class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 space-y-2">
-            <div class="text-sm font-semibold text-gray-700">Preview Result</div>
+
+          <!-- Preview result -->
+          <div v-if="restorePreviewResult" class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
+            <div class="text-sm font-semibold text-gray-700">Preview</div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
               <div class="bg-white rounded border border-gray-200 px-2.5 py-2 text-center">
                 <div class="font-bold text-gray-900">{{ restorePreviewResult.companies_count }}</div>
@@ -454,13 +525,32 @@ function importTypeBadge(type: string): string {
               </div>
             </div>
             <div v-if="restorePreviewResult.warnings.length" class="space-y-1">
-              <div
-                v-for="w in restorePreviewResult.warnings"
-                :key="w"
-                class="text-xs text-amber-700"
-              >⚠ {{ w }}</div>
+              <div v-for="w in restorePreviewResult.warnings" :key="w" class="text-xs text-amber-700">⚠ {{ w }}</div>
             </div>
             <div class="text-xs text-emerald-700">{{ restorePreviewResult.safety_notice }}</div>
+
+            <!-- Confirm restore -->
+            <div v-if="restorePreviewResult.valid" class="border-t border-gray-200 pt-3 space-y-2">
+              <div v-if="restoreResult" class="rounded bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700">
+                Workspace restored. {{ restoreResult.companies_restored }} companies, {{ restoreResult.prospects_restored }} prospects, {{ restoreResult.signals_restored }} signals.
+              </div>
+              <label class="block text-xs font-semibold text-gray-700">
+                Type <code class="bg-gray-100 px-1 rounded font-mono">RESTORE DOBRYBOT WORKSPACE</code> to confirm:
+              </label>
+              <input
+                v-model="restoreConfirmText"
+                type="text"
+                placeholder="RESTORE DOBRYBOT WORKSPACE"
+                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-mono placeholder:text-gray-300 focus:border-blue-400 focus:outline-none"
+              />
+              <button
+                :disabled="restoreConfirmText !== RESTORE_CONFIRM || restoring"
+                @click="runRestore"
+                class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {{ restoring ? 'Restoring…' : 'Restore Workspace' }}
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -468,22 +558,83 @@ function importTypeBadge(type: string): string {
       <!-- ── Safe Reset Zone ──────────────────────────────────────────────── -->
       <section>
         <h2 class="text-sm font-semibold text-red-600 mb-3">Safe Reset Zone</h2>
-        <div class="rounded-xl border border-red-200 bg-red-50 px-5 py-4 space-y-4">
+        <div class="rounded-xl border border-red-200 bg-red-50 px-5 py-5 space-y-6">
           <p class="text-sm text-red-700 font-medium">
-            Clearing workspace data is irreversible. Export a backup first.
-            Source-level clear (demo-only, imported-only) requires Phase 17 per-record source tracking.
+            Clearing data is irreversible. Export or backup first.
           </p>
 
-          <div v-if="clearResult" class="rounded-lg bg-white border border-emerald-200 px-4 py-3 text-sm text-emerald-700">
-            Workspace cleared. {{ clearResult.records_removed }} records removed.
-            {{ clearResult.safety_notice }}
+          <!-- Clear demo -->
+          <div class="bg-white rounded-lg border border-red-100 px-4 py-4 space-y-2">
+            <div class="text-sm font-semibold text-gray-800">Clear Demo Data</div>
+            <p class="text-xs text-gray-500">Removes all records with <code class="bg-gray-100 px-1 rounded">source=demo</code>. Preserves imported, manual, and generated records.</p>
+
+            <div v-if="clearDemoResult" class="rounded bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700">
+              {{ clearDemoResult.records_removed }} demo records removed.
+            </div>
+            <div v-if="clearDemoError" class="rounded bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{{ clearDemoError }}</div>
+
+            <div v-if="!hasDemoData && !clearDemoResult" class="text-xs text-gray-400">No demo data detected in workspace.</div>
+            <template v-else>
+              <label class="block text-xs font-semibold text-red-700">
+                Type <code class="bg-red-100 px-1 rounded font-mono">CLEAR DEMO DATA</code> to confirm:
+              </label>
+              <input
+                v-model="clearDemoConfirmText"
+                type="text"
+                placeholder="CLEAR DEMO DATA"
+                class="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-mono placeholder:text-red-200 focus:border-red-400 focus:outline-none"
+              />
+              <button
+                :disabled="clearDemoConfirmText !== CLEAR_DEMO_CONFIRM || clearingDemo"
+                @click="clearDemo"
+                class="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {{ clearingDemo ? 'Clearing…' : 'Clear Demo Data' }}
+              </button>
+            </template>
           </div>
 
-          <div v-if="clearError" class="rounded-lg bg-white border border-red-200 px-3 py-2 text-sm text-red-700">
-            {{ clearError }}
+          <!-- Clear imported -->
+          <div class="bg-white rounded-lg border border-red-100 px-4 py-4 space-y-2">
+            <div class="text-sm font-semibold text-gray-800">Clear Imported Data</div>
+            <p class="text-xs text-gray-500">Removes all records with <code class="bg-gray-100 px-1 rounded">source=imported</code>. Preserves demo, manual, and generated records.</p>
+
+            <div v-if="clearImportedResult" class="rounded bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700">
+              {{ clearImportedResult.records_removed }} imported records removed.
+            </div>
+            <div v-if="clearImportedError" class="rounded bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{{ clearImportedError }}</div>
+
+            <div v-if="!hasImportedData && !clearImportedResult" class="text-xs text-gray-400">No imported data detected in workspace.</div>
+            <template v-else>
+              <label class="block text-xs font-semibold text-red-700">
+                Type <code class="bg-red-100 px-1 rounded font-mono">CLEAR IMPORTED DATA</code> to confirm:
+              </label>
+              <input
+                v-model="clearImportedConfirmText"
+                type="text"
+                placeholder="CLEAR IMPORTED DATA"
+                class="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-mono placeholder:text-red-200 focus:border-red-400 focus:outline-none"
+              />
+              <button
+                :disabled="clearImportedConfirmText !== CLEAR_IMPORTED_CONFIRM || clearingImported"
+                @click="clearImported"
+                class="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {{ clearingImported ? 'Clearing…' : 'Clear Imported Data' }}
+              </button>
+            </template>
           </div>
 
-          <div class="space-y-2">
+          <!-- Clear all -->
+          <div class="bg-white rounded-lg border border-red-200 px-4 py-4 space-y-2">
+            <div class="text-sm font-semibold text-red-700">Clear All Workspace Data</div>
+            <p class="text-xs text-gray-500">Removes everything — demo, imported, manual, and generated. Activity log is preserved. Irreversible.</p>
+
+            <div v-if="clearResult" class="rounded bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700">
+              Workspace cleared. {{ clearResult.records_removed }} records removed.
+            </div>
+            <div v-if="clearError" class="rounded bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{{ clearError }}</div>
+
             <label class="block text-xs font-semibold text-red-700">
               Type <code class="bg-red-100 px-1 rounded font-mono">CLEAR DOBRYBOT WORKSPACE</code> to confirm:
             </label>

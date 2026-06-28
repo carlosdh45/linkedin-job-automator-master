@@ -73,3 +73,7 @@ def count_by_status(path: str, status: str) -> int:
 
 def clear_recommendations(path: str) -> None:
     _save(path, [])
+
+
+def replace_all(path: str, recommendations: List[BDRecommendation]) -> None:
+    _save(path, recommendations)

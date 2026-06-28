@@ -117,6 +117,7 @@ def create_opportunity_from_recommendation(
         "score": score,
         "score_label": label,
         "notes": f"Created from {rec.priority} recommendation: {rec.reason}",
+        "source": "generated",
     })
 
     update_recommendation(path, rec_id, {"status": "actioned"})
@@ -224,6 +225,7 @@ def refresh_recommendations(
                 "reason": result["reason"],
                 "recommended_action": result["recommended_action"],
                 "confidence_score": result["confidence_score"],
+                "source": "generated",
             })
             recs_created += 1
 
@@ -247,6 +249,7 @@ def refresh_recommendations(
 
         recs, flags = _eval_company(co, co_signals, co_pain_points, co_opps, icp_config)
         for rec in recs:
+            rec["source"] = "generated"
             create_recommendation(recommendation_path, rec)
             recs_created += 1
 
@@ -295,6 +298,7 @@ def refresh_recommendations(
                     else f"Prepare outreach draft for {opp.company_name}"
                 ),
                 "confidence_score": min(100, result["new_score"]),
+                "source": "generated",
             })
             recs_created += 1
 

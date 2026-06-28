@@ -20,6 +20,7 @@ import type {
   BDImportHistoryEntry,
   BDWorkspaceStatus,
   BDRestorePreviewResult,
+  BDRestoreResult,
   BDClearResult,
 } from '~/types'
 
@@ -235,6 +236,12 @@ export const useApi = () => {
       post<BDRestorePreviewResult>('/api/bd/workspace/restore-preview', backup),
     clearAllWorkspace: (confirmText: string) =>
       post<BDClearResult>('/api/bd/workspace/clear-all', { confirm_text: confirmText }),
+    clearDemoData: (confirmText: string) =>
+      post<BDClearResult>('/api/bd/workspace/clear-demo', { confirm_text: confirmText }),
+    clearImportedData: (confirmText: string) =>
+      post<BDClearResult>('/api/bd/workspace/clear-imported', { confirm_text: confirmText }),
+    restoreWorkspace: (backup: Record<string, unknown>, confirmText: string, dryRun = false) =>
+      post<BDRestoreResult>('/api/bd/workspace/restore', { backup, confirm_text: confirmText, dry_run: dryRun }),
     // BD OS — Exports (Phase 16)
     exportUrl: (type: 'companies' | 'prospects' | 'signals' | 'opportunities' | 'workspace') => {
       if (type === 'workspace') return `${base}/api/bd/export/workspace.json`

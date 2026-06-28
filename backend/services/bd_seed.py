@@ -162,6 +162,8 @@ def seed_bd_demo(
             status="identified",
         ),
     ]
+    for item in companies:
+        item.source = "demo"
     bd_company_store.replace_all(company_path, companies)
 
     co_by_name = {c.name: c for c in companies}
@@ -247,6 +249,8 @@ def seed_bd_demo(
             status="identified",
         ),
     ]
+    for item in prospects:
+        item.source = "demo"
     bd_prospect_store.replace_all(prospect_path, prospects)
 
     # ── Signals ───────────────────────────────────────────────────────────────
@@ -317,6 +321,8 @@ def seed_bd_demo(
             detected_at="2026-06-10",
         ),
     ]
+    for item in signals:
+        item.data_source = "demo"
     bd_signal_store.replace_all(signal_path, signals)
 
     # ── Pain Points ───────────────────────────────────────────────────────────
@@ -412,6 +418,8 @@ def seed_bd_demo(
             recommended_angle="Pipeline observability and error recovery frameworks reducing incident MTTR by 40%",
         ),
     ]
+    for item in pain_points:
+        item.source = "demo"
     bd_pain_point_store.replace_all(pain_point_path, pain_points)
 
     # ── Opportunities ─────────────────────────────────────────────────────────
@@ -483,6 +491,8 @@ def seed_bd_demo(
             recommended_action="Identify right contact — likely CTO Drew Kim. Validate pain before first outreach",
         ),
     ]
+    for item in opportunities:
+        item.source = "demo"
     bd_opportunity_store.replace_all(opportunity_path, opportunities)
 
     # ── Deal Packets ──────────────────────────────────────────────────────────
@@ -593,6 +603,8 @@ Given the timeline pressure that comes with a new fund, would a 20-minute conver
     )
 
     deal_packets = [meridian_packet, vantage_packet, summit_packet]
+    for item in deal_packets:
+        item.source = "demo"
     bd_deal_packet_store.replace_all(deal_packet_path, deal_packets)
 
     # ── Outreach Drafts ───────────────────────────────────────────────────────
@@ -643,6 +655,8 @@ Given the timeline pressure that comes with a new fund, would a 20-minute conver
             status="draft",
         ),
     ]
+    for item in outreach_drafts:
+        item.source = "demo"
     bd_outreach_store.replace_all(outreach_path, outreach_drafts)
 
     return {

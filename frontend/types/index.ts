@@ -543,7 +543,22 @@ export interface BDWorkspaceStatus {
   last_activity_date: string | null
   icp_configured: boolean
   data_health_warnings: string[]
+  source_breakdown: Record<string, number>
   local_only: boolean
+  safety_notice: string
+}
+
+export interface BDRestoreResult {
+  dry_run: boolean
+  companies_restored: number
+  prospects_restored: number
+  signals_restored: number
+  pain_points_restored: number
+  opportunities_restored: number
+  deal_packets_restored: number
+  outreach_drafts_restored: number
+  recommendations_restored: number
+  warnings: string[]
   safety_notice: string
 }
 

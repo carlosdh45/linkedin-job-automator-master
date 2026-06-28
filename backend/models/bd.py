@@ -29,6 +29,7 @@ class BDCompany(BaseModel):
     icp_match: bool = False
     status: str = "identified"
     notes: str = ""
+    source: Optional[str] = None   # "demo" | "imported" | "manual" | "generated" | None→legacy
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
 
@@ -74,6 +75,7 @@ class BDProspect(BaseModel):
     recommended_angle: Optional[str] = None
     status: str = "identified"
     notes: str = ""
+    source: Optional[str] = None
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
 
@@ -113,7 +115,8 @@ class BDSignal(BaseModel):
     prospect_id: Optional[str] = None
     signal_type: str = "other"
     summary: str
-    source: Optional[str] = None
+    source: Optional[str] = None        # external source string OR data-origin tag
+    data_source: Optional[str] = None   # "demo" | "imported" | "manual" | "generated" | None→legacy
     relevance_score: int = 50
     detected_at: str = Field(default_factory=lambda: datetime.utcnow().date().isoformat())
     reviewed: bool = False
@@ -147,6 +150,7 @@ class BDPainPoint(BaseModel):
     signal_source: Optional[str] = None
     confidence: int = 70
     recommended_angle: Optional[str] = None
+    source: Optional[str] = None
     created_at: str = Field(default_factory=_now)
 
 
@@ -175,6 +179,7 @@ class BDOpportunity(BaseModel):
     recommended_action: Optional[str] = None
     deal_packet_id: Optional[str] = None
     notes: str = ""
+    source: Optional[str] = None
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
     # Phase 11: Recalculation tracking
@@ -233,6 +238,7 @@ class BDDealPacket(BaseModel):
     checklist: List[BDChecklistItem] = Field(default_factory=list)
     status: str = "draft"
     notes: str = ""
+    source: Optional[str] = None
     created_at: str = Field(default_factory=_now)
     updated_at: Optional[str] = None
 
@@ -265,6 +271,7 @@ class BDOutreachDraft(BaseModel):
     quality_status: str = "draft"
     status: str = "draft"
     notes: str = ""
+    source: Optional[str] = None
     created_at: str = Field(default_factory=_now)
     updated_at: Optional[str] = None
 
@@ -443,6 +450,7 @@ class BDRecommendation(BaseModel):
     recommended_action: str
     confidence_score: int = 50
     status: str = "new"       # "new" | "reviewed" | "dismissed" | "actioned"
+    source: Optional[str] = None
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
 
@@ -559,8 +567,24 @@ class BDWorkspaceStatus(BaseModel):
     last_activity_date: Optional[str] = None
     icp_configured: bool = False
     data_health_warnings: List[str] = Field(default_factory=list)
+    # Phase 17: source breakdown
+    source_breakdown: dict = Field(default_factory=dict)
     local_only: bool = True
     safety_notice: str = "All workspace data is stored locally. No external APIs are called."
+
+
+class BDRestoreResult(BaseModel):
+    dry_run: bool
+    companies_restored: int = 0
+    prospects_restored: int = 0
+    signals_restored: int = 0
+    pain_points_restored: int = 0
+    opportunities_restored: int = 0
+    deal_packets_restored: int = 0
+    outreach_drafts_restored: int = 0
+    recommendations_restored: int = 0
+    warnings: List[str] = Field(default_factory=list)
+    safety_notice: str = "All restored data is local only. No external services were contacted."
 
 
 class BDRestorePreviewResult(BaseModel):

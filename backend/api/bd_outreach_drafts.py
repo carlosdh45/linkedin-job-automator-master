@@ -52,6 +52,7 @@ def create_draft(
         notes=data.notes,
         status="draft",
         quality_status="draft",
+        source="manual",
     )
     saved = save_draft(path, draft)
     log_activity(activity_path, {

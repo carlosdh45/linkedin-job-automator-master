@@ -28,6 +28,7 @@ def create_signal_endpoint(data: BDSignalCreate, path: str = Depends(get_bd_sign
     payload = data.model_dump()
     if not payload.get("detected_at"):
         payload["detected_at"] = datetime.utcnow().date().isoformat()
+    payload["data_source"] = "manual"
     return create_signal(path, payload)
 
 
@@ -76,6 +77,7 @@ def evaluate_all_signals(
                 "reason": result["reason"],
                 "recommended_action": result["recommended_action"],
                 "confidence_score": result["confidence_score"],
+                "source": "generated",
             })
             recs_created += 1
 
@@ -141,6 +143,7 @@ def evaluate_signal_endpoint(
             "reason": result["reason"],
             "recommended_action": result["recommended_action"],
             "confidence_score": result["confidence_score"],
+            "source": "generated",
         })
         recommendation_created = True
 
