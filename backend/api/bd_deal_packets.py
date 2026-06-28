@@ -79,6 +79,7 @@ def _generate_packet(req: BDDealPacketGenerateRequest) -> BDDealPacket:
         checklist=checklist,
         status="draft",
         notes=req.notes,
+        source="generated",
     )
 
 

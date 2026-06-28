@@ -324,12 +324,14 @@ class TestClearAll:
         activities = list_activity(p16_paths["activity"])
         assert any(a.action == "workspace_cleared" for a in activities)
 
-    def test_clear_demo_returns_400(self, client):
-        r = client.post("/api/bd/workspace/clear-demo")
+    def test_clear_demo_requires_confirm_text(self, client):
+        # Phase 17: clear-demo is now functional — wrong confirm_text returns 400
+        r = client.post("/api/bd/workspace/clear-demo", json={"confirm_text": "wrong"})
         assert r.status_code == 400
 
-    def test_clear_imported_returns_400(self, client):
-        r = client.post("/api/bd/workspace/clear-imported")
+    def test_clear_imported_requires_confirm_text(self, client):
+        # Phase 17: clear-imported is now functional — wrong confirm_text returns 400
+        r = client.post("/api/bd/workspace/clear-imported", json={"confirm_text": "wrong"})
         assert r.status_code == 400
 
 
